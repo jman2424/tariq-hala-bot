@@ -1,0 +1,5 @@
+# Ignore model binaries and large files
+gpt4all/
+*.gguf
+*.dll
+*.bin
