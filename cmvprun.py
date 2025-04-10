@@ -33,7 +33,7 @@ Chatbot:
 # ✅ Connect prompt with Langchain model
 chatbot = LLMChain(prompt=prompt, llm=llm) if llm else None
 
-# ✅ Ngrok URL (used for Twilio Webhook)
+# ✅ Ngrok or public URL
 NGROK_URL = "https://e677-2a02-6b67-d903-2000-b0ea-b319-3a35-411a.ngrok-free.app"
 
 @app.route("/whatsapp", methods=["POST"])
@@ -41,8 +41,6 @@ def whatsapp_webhook():
     """Handles incoming WhatsApp messages from Twilio."""
     try:
         print(f"🔹 Incoming Request Data: {request.values}")
-
-        # ✅ Get the incoming message
         incoming_msg = request.values.get("Body", "").strip()
 
         if not incoming_msg:
@@ -51,7 +49,6 @@ def whatsapp_webhook():
 
         print(f"✅ Received Message: {incoming_msg}")
 
-        # ✅ Generate AI response
         if chatbot:
             print("🟡 Generating AI response...")
             ai_response = chatbot.invoke({"input": incoming_msg})
@@ -60,7 +57,6 @@ def whatsapp_webhook():
 
         print(f"✅ AI Response: {ai_response}")
 
-        # ✅ Send response back to WhatsApp
         response = MessagingResponse()
         response.message(ai_response)
 
@@ -85,7 +81,5 @@ def home():
     return "✅ Hello, Your chatbot is running."
 
 if __name__ == "__main__":
-   port = int(os.environ.get("PORT", 5000))  # ✅ Use 5000 locally, Render will provide PORT
-   app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
-
- 
+    port = int(os.environ.get("PORT", 5000))  # ✅ Use 5000 locally, Render will provide PORT
+    app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
