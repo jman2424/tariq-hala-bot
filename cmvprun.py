@@ -54,7 +54,7 @@ def whatsapp_webhook():
         # ✅ Generate AI response
         if chatbot:
             print("🟡 Generating AI response...")
-            ai_response = chatbot.run({"input": incoming_msg})
+            ai_response = chatbot.invoke({"input": incoming_msg})
         else:
             ai_response = "❌ Chatbot is not available right now."
 
