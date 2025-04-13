@@ -81,5 +81,5 @@ def home():
     return "✅ Hello, Your chatbot is running."
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # ✅ Use 5000 locally, Render will provide PORT
+    port = int(os.environ.get("PORT", 1234))  # ✅ Use 5000 locally, Render will provide PORT
     app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
