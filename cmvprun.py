@@ -1,37 +1,28 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-from langchain_ollama import OllamaLLM
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+import openai
 import os
 import traceback
 
 app = Flask(__name__)
 
-# ✅ Load the Halal Chatbot model
-try:
-    llm = OllamaLLM(model="halal-chatbot")
-    print("✅ Model loaded successfully.")
-except Exception as e:
-    print(f"❌ ERROR: Failed to load model: {e}")
-    llm = None  # Ensure llm is defined to prevent crash later
+# ✅ Set your OpenAI API key
+openai.api_key = "your-openai-api-key"  # Replace with your OpenAI API key
 
 # ✅ Define chatbot prompt template
-prompt = PromptTemplate(
-    input_variables=["input"],
-    template="""
-You are a customer service chatbot for Tariq Halal Meat.
-- Give **brief responses (1-2 sentences only)**.
-- **Reply quickly** and do not generate long messages.
-- If more details are needed, **ask the user if they want more info**.
-
-Customer: {input}
-Chatbot:
-"""
-)
-
-# ✅ Connect prompt with Langchain model
-chatbot = LLMChain(prompt=prompt, llm=llm) if llm else None
+def generate_response(user_input):
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a customer service chatbot for Tariq Halal Meat."},
+                {"role": "user", "content": user_input},
+            ]
+        )
+        return response['choices'][0]['message']['content']
+    except Exception as e:
+        print(f"❌ ERROR: {e}")
+        return "❌ Chatbot is not available right now."
 
 # ✅ Ngrok or public URL
 NGROK_URL = "https://e677-2a02-6b67-d903-2000-b0ea-b319-3a35-411a.ngrok-free.app"
@@ -49,11 +40,9 @@ def whatsapp_webhook():
 
         print(f"✅ Received Message: {incoming_msg}")
 
-        if chatbot:
-            print("🟡 Generating AI response...")
-            ai_response = chatbot.invoke({"input": incoming_msg})
-        else:
-            ai_response = "❌ Chatbot is not available right now."
+        # 🟡 Generate AI response using OpenAI GPT-3.5 Turbo
+        print("🟡 Generating AI response...")
+        ai_response = generate_response(incoming_msg)
 
         print(f"✅ AI Response: {ai_response}")
 
