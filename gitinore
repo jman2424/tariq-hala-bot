@@ -1,0 +1,16 @@
+# Ignore entire gpt4all directory
+gpt4all/
+
+# Ignore binary/model files globally
+*.gguf
+*.dll
+*.bin
+*.h5
+*.tar
+*.zip
+*.pkl
+*.dat
+
+# Optional: If you want to ignore any additional temporary files
+*.log
+*.tmp
