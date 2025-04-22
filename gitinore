@@ -1,7 +1,30 @@
-# Ignore entire gpt4all directory
-gpt4all/
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+*.log
+*.tmp
 
-# Ignore binary/model files globally
+# ======================
+# Environment variables
+# ======================
+.env
+
+# ======================
+# AI/LLM model files
+# ======================
 *.gguf
 *.dll
 *.bin
@@ -11,6 +34,13 @@ gpt4all/
 *.pkl
 *.dat
 
-# Optional: If you want to ignore any additional temporary files
-*.log
-*.tmp
+# ======================
+# Project-specific
+# ======================
+gpt4all/
+
+# ======================
+# OS-generated files
+# ======================
+.DS_Store
+Thumbs.db
