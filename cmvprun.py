@@ -62,4 +62,13 @@ def whatsapp_status_callback():
     """Handles Twilio message status updates."""
     status = request.values.get("MessageStatus", "")
     message_sid = request.values.get("MessageSid", "")
-    print(f"🔹 Message SID: {
+    print(f"🔹 Message SID: {message_sid}, Status: {status}")
+    return "Status received", 200
+
+@app.route("/")
+def home():
+    return "✅ Hello, Your chatbot is running."
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 1234))  # ✅ Use 5000 locally, Render will provide PORT
+    app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
