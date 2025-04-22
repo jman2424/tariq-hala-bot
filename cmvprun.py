@@ -1,25 +1,25 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import openai
+from openai import OpenAI
 import os
 import traceback
 
 app = Flask(__name__)
 
 # ✅ Set your OpenAI API key
-openai.api_key = "your-openai-api-key"  # Replace with your OpenAI API key
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # Use your real key or load from .env
 
 # ✅ Define chatbot prompt template
 def generate_response(user_input):
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a customer service chatbot for Tariq Halal Meat."},
                 {"role": "user", "content": user_input},
             ]
         )
-        return response['choices'][0]['message']['content']
+        return response.choices[0].message.content
     except Exception as e:
         print(f"❌ ERROR: {e}")
         return "❌ Chatbot is not available right now."
@@ -62,13 +62,4 @@ def whatsapp_status_callback():
     """Handles Twilio message status updates."""
     status = request.values.get("MessageStatus", "")
     message_sid = request.values.get("MessageSid", "")
-    print(f"🔹 Message SID: {message_sid}, Status: {status}")
-    return "Status received", 200
-
-@app.route("/")
-def home():
-    return "✅ Hello, Your chatbot is running."
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 1234))  # ✅ Use 5000 locally, Render will provide PORT
-    app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
+    print(f"🔹 Message SID: {
