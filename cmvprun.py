@@ -12,6 +12,84 @@ app = Flask(__name__)
 # ✅ Load OpenAI API key from .env
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# ✅ Store product catalog separately for easy updates
+PRODUCT_CATALOG = {
+    "Lamb": {
+        "Lamb Mince 500g": "£5.99",
+        "Lamb Chops 1kg": "£10.99",
+        "Lamb Shoulder 1kg": "£9.99"
+    },
+    "Beef": {
+        "Beef Steak 1kg": "£9.49",
+        "Beef Mince 500g": "£4.99"
+    },
+    "Chicken": {
+        "Whole Chicken 1.2kg": "£4.99",
+        "Chicken Breast 1kg": "£6.99",
+        "Chicken Wings 1kg": "£4.49"
+    },
+    "Marinated Meats": {
+        "Spicy Chicken Wings 1kg": "£5.49",
+        "Marinated Lamb Chops 1kg": "£11.99",
+        "Marinated Chicken Tikka 1kg": "£6.99",
+        "Marinated Chicken Wings 1kg": "£5.49",
+        "Peri Peri Chicken 1kg": "£6.99"
+    },
+    "Exotic Meats": {
+        "Goat Meat 1kg": "£10.99",
+        "Camel Mince 1kg": "£12.99",
+        "Venison Fillet 500g": "£13.50"
+    },
+    "Groceries": {
+        "Basmati Rice 5kg": "£8.99",
+        "Chickpeas 2kg": "£2.99",
+        "Lentils 2kg": "£3.49"
+    },
+    "Spices & Seasonings": {
+        "Cumin Seeds 100g": "£1.50",
+        "Turmeric Powder 100g": "£1.00",
+        "Garam Masala 100g": "£1.25"
+    },
+    "Sauces": {
+        "Peri Peri Sauce 250ml": "£2.00",
+        "Mint Sauce 250ml": "£1.75",
+        "Yogurt Sauce 250ml": "£1.50",
+        "BBQ Sauce 250ml": "£1.80",
+        "Chilli Sauce 250ml": "£1.60"
+    },
+    "Flour, Naan, Chapatti": {
+        "Chapatti Flour 10kg": "£7.50",
+        "Plain Naan (2 pieces)": "£1.00",
+        "Garlic Naan (2 pieces)": "£1.20"
+    },
+    "Drinks & Mocktails": {
+        "Mango Juice 1L": "£1.50",
+        "Pineapple Juice 1L": "£1.50",
+        "Mocktail Mojito 330ml": "£1.00",
+        "Strawberry Mocktail 330ml": "£1.00",
+        "Lychee Drink 330ml": "£1.00"
+    },
+    "Tea & Coffee": {
+        "Loose Black Tea 250g": "£2.75",
+        "Instant Coffee 200g": "£3.50"
+    },
+    "Oils & Ghee": {
+        "Sunflower Oil 1L": "£2.99",
+        "Vegetable Oil 1L": "£2.75",
+        "Desi Ghee 500g": "£4.50"
+    },
+    "Everyday Essentials": {
+        "Toilet Roll 9 Pack": "£3.99",
+        "Kitchen Roll 2 Pack": "£2.50",
+        "Bin Bags 20pcs": "£1.99"
+    },
+    "Bakery": {
+        "Plain Naan (2 pieces)": "£1.00",
+        "Tandoori Roti (5 pieces)": "£1.20",
+        "Sweet Buns Pack": "£1.50"
+    }
+}
+
 # ✅ Store information for Tariq Halal Meats
 STORE_INFO = """
 Tariq Halal Meats Delivery Info:
@@ -38,7 +116,7 @@ Customer Service:
 - 📩 Email support: info@tariqhalalmeats.com
 - 📦 No returns due to perishable nature of goods.
 
-Branch Info:
+Branches:
 - Cardiff: 104-106 Albany Road, CF24 3RT | 02920 485 569 | 9am - 8pm
 - Crawley: 33 Queensway, RH10 1EG | 0129 352 2189 | 8am - 7pm
 - Croydon: 89 London Road, CR0 2RF | 0208 686 8846 | 9am - 8:30pm
@@ -55,10 +133,10 @@ Branch Info:
 - South Harrow: 387 Northolt Road, HA2 8JD | 0208 423 4975 | 9am - 8pm
 - Southall: 126 The Broadway, UB1 1QF | 0203 337 8794 | 9am - 8pm
 - St Johns Wood: 10 Lodge Road, NW8 7JA | 0207 483 2938 | 9am - 9pm
-- Stratford Shopping Centre: Unit 47/48 The Mall, E15 1XE | 0204 506 5693 | 9am - 10pm (Sun 10am - 7pm)
+- Stratford: Unit 47/48 The Mall, E15 1XE | 0204 506 5693 | 9am - 10pm (Sun 10am - 7pm)
 - Streatham: 14 Leighham Parade, SW16 1DR | 0208 664 7045 | 9am - 8pm
-- Supermarket Wealdstone: 14-20 High Street, HA3 7HA | 0208 863 1353 | 7am - 10pm
-- High Wycombe: 185 Dessborough Road, HP11 2QN | 01494 422 280 | 9am - 8pm (Shop: 9am - 9:30pm)
+- Wealdstone: 14-20 High Street, HA3 7HA | 0208 863 1353 | 7am - 10pm
+- High Wycombe: 185 Desborough Road, HP11 2QN | 01494 422 280 | 9am - 8pm (Shop: 9am - 9:30pm)
 - Holborn: 183 Drury Lane, WC2B 5QF | 0207 430 9888 | 8am - 8pm (Temp Closed)
 - Reading: 477 Oxford Road, RG30 1HF | 0118 956 0664 | 8am - 8pm
 - Old Kent Road: 282-286 Old Kent Rd, SE1 5UE | 0203 649 7157 | 8am - 8pm
@@ -129,8 +207,3 @@ def whatsapp_status_callback():
 @app.route("/")
 def home():
     return "✅ Hello, Your chatbot is running."
-
-# ✅ Start Flask app
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 1234))
-    app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False)
