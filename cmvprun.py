@@ -116,6 +116,9 @@ Customer Service:
 - 📩 Email support: info@tariqhalalmeats.com
 - 📦 No returns due to perishable nature of goods.
 
+Halal Certification:
+- ✅ All products at Tariq Halal Meats are certified Halal by reputable certifying bodies. 
+
 Branches:
 - Cardiff: 104-106 Albany Road, CF24 3RT | 02920 485 569 | 9am - 8pm
 - Crawley: 33 Queensway, RH10 1EG | 0129 352 2189 | 8am - 7pm
