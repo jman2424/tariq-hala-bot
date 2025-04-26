@@ -1,16 +1,28 @@
+# Core Requirements
 Flask==3.1.0
+Werkzeug==3.0.3  # Pinned for Flask 3.1.0 compatibility
 twilio==9.4.6
 openai==1.75.0
-requests==2.32.3
 python-dotenv==1.0.1
+flask-caching==2.1.0
+
+# Production Server
 gunicorn==23.0.0
-Werkzeug==3.1.3
-tqdm==4.67.1
+
+# HTTP/Dependencies
+requests==2.32.3
 httpx==0.28.1
 httpcore==1.0.7
+
+# Utilities
+tqdm==4.67.1
 greenlet==3.1.1
-idna==3.10
-charset-normalizer==3.4.1
+
+# Security
 certifi==2025.1.31
+charset-normalizer==3.4.1
+idna==3.10
+
+# Data Validation (if using Pydantic)
 pydantic==2.10.6
 pydantic-settings==2.8.1
