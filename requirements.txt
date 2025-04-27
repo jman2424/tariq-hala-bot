@@ -1,6 +1,6 @@
 # Core Requirements
 Flask==3.1.0
-Werkzeug==3.0.3  # Pinned for Flask 3.1.0 compatibility
+Werkzeug==3.1.1  # Pinned for Flask 3.1.0 compatibility
 twilio==9.4.6
 openai==1.75.0
 python-dotenv==1.0.1
