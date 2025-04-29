@@ -12,7 +12,6 @@ import logging
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-
 # Initialize Flask app
 app = Flask(__name__)
 
@@ -37,7 +36,7 @@ limiter = Limiter(
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 
-# ========== PRODUCT CATALOG ==========
+# ========== COMPLETE PRODUCT CATALOG WITH PRICES ==========
 PRODUCT_CATALOG = {
     "POULTRY": {
         "5 Boiler (Hen)": "£19.99",
@@ -191,7 +190,7 @@ PRODUCT_CATALOG = {
         "Beef Topside Strips 1kg": "£17.99",
         "Veal Premium Bacon Pre Sliced (650G)": "£16.99 (Out of stock)"
     },
-    "Groceries": {
+    "GROCERIES": {
         "Basmati Rice 5kg": "£8.99",
         "Chickpeas 2kg": "£2.99",
         "Lentils 2kg": "£3.49",
@@ -222,7 +221,7 @@ PRODUCT_CATALOG = {
         "Tandoori Roti (5 pieces)": "£1.20",
         "Sweet Buns Pack": "£1.50"
     },
-    "Frozen Meats": {
+    "FROZEN MEATS": {
         "Halal Frozen Grade A Chicken (800g)": "£3.99",
         "Frozen Halal Whole Turkey": "£34.99 (CANNOT BE PREORDERED)",
         "Halal Frozen Whole Duck (2.8-3.0kg)": "£24.99",
@@ -234,7 +233,7 @@ PRODUCT_CATALOG = {
         "Frozen Halal Pigeon": "£14.99 (Out of stock)",
         "Frozen Halal Buffalo Meat (1kg)": "£11.99 (Out of stock)"
     },
-    "Exotic Meats": {
+    "EXOTIC MEATS": {
         "Whole Frozen Milk Fed Suckling Lamb Shoulder": "£19.99 (Out of stock)",
         "Whole Frozen Milk Fed Suckling Lamb Leg": "£19.99",
         "Whole Kid Goat (4Kg-5Kg)": "£95.00",
@@ -258,8 +257,8 @@ PRODUCT_CATALOG = {
         "Chicken Hearts (1Kg)": "£5.99",
         "Chicken Liver (1Kg)": "£5.99"
     },
-    "Marinated Meats": {
-        "Chicken": {
+    "MARINATED MEATS": {
+        "CHICKEN": {
             "Truffle Chicken Cubes (1kg)": "£9.99",
             "Mumtaz Lemon Pepper & Herb Wings (1kg)": "£8.99",
             "Dragons Fire Chicken Niblets": "£8.99",
@@ -279,7 +278,7 @@ PRODUCT_CATALOG = {
             "Spicy Mexican Fajita Chicken Strips": "£9.99",
             "Italian Green Pesto Chicken": "£9.99"
         },
-        "Lamb": {
+        "LAMB": {
             "Truffle Lamb Chops (1kg)": "£24.99",
             "Mumtaz Sticky BBQ Lamb Ribs 1kg": "£11.99",
             "Mumtaz Lamb Chops 1kg": "£24.99",
@@ -288,18 +287,18 @@ PRODUCT_CATALOG = {
             "Greek Lamb Gyros (kebab)": "£10.99",
             "Hot & Spicy Lamb Chops": "£24.99"
         },
-        "Beef": {
+        "BEEF": {
             "MARINATED BEEF T-BONE": "£11.99",
             "Marinated Sirloin Steak": "£9.99",
             "Fire In The Hole Beef Ribs": "£14.99"
         },
-        "Combos": {
+        "COMBOS": {
             "COMBO - Greek Chicken & Lamb Gyros (kebab) 1kg": "£12.99"
         }
     }
 }
 
-# ========== STORE INFORMATION ==========
+# ========== COMPLETE STORE INFORMATION ==========
 STORE_INFO = """
 Tariq Halal Meats Delivery Info:
 
@@ -366,14 +365,18 @@ def find_products(search_term):
     
     for category, products in PRODUCT_CATALOG.items():
         matched_products = []
-        for product, price in products.items():
-            if isinstance(products, dict):  # Main categories
+        
+        # Handle marinated meats subcategories
+        if isinstance(products, dict) and category == "MARINATED MEATS":
+            for subcategory, sub_products in products.items():
+                for product, price in sub_products.items():
+                    if search_term in product.lower():
+                        matched_products.append((f"{subcategory} - {product}", price))
+        # Handle regular categories
+        else:
+            for product, price in products.items():
                 if search_term in product.lower():
                     matched_products.append((product, price))
-            elif isinstance(products, dict) and isinstance(products[product], dict):  # Marinated subcategories
-                for sub_product, sub_price in products[product].items():
-                    if search_term in sub_product.lower():
-                        matched_products.append((f"{product} - {sub_product}", sub_price))
         
         if matched_products:
             results[category] = matched_products
@@ -398,7 +401,7 @@ def generate_ai_response(user_query):
                 },
                 {
                     "role": "user",
-                    "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"
+                    "content": f"Business Info:\n{STORE_INFO}\n\nProduct Catalog:\n{str(PRODUCT_CATALOG)}\n\nCustomer Question: {user_query}"
                 }
             ],
             temperature=0.3,
@@ -427,32 +430,73 @@ def handle_whatsapp_message():
             return "Unauthorized", 403
 
         # Get and validate message
-        message = request.values.get('Body', '').strip()
-        if not message:
+        incoming_msg = request.values.get('Body', '').strip().lower()
+        if not incoming_msg:
             return "Empty message", 400
 
-        logger.info(f"Received message: {message}")
+        logger.info(f"Received message: {incoming_msg}")
 
-        # 1. First try to find matching products
-        product_results = find_products(message)
-        if product_results:
-            response = ["We found these matching products:"]
-            for category, items in product_results.items():
-                response.append(f"\n*{category}*")
-                response.extend(f"- {name}: {price}" for name, price in items)
-            response.append("\nNeed anything else?")
-            reply = "\n".join(response)
-        # 2. Fall back to AI for general questions
+        # Initialize response
+        resp = MessagingResponse()
+        
+        # Handle specific commands
+        if incoming_msg in ['hi', 'hello', 'hey']:
+            reply = ("🕌 Welcome to Tariq Halal Meats!\n\n"
+                    "You can ask about:\n"
+                    "- Products & prices 🛒\n"
+                    "- Delivery info 🚚\n"
+                    "- Store locations 🏪\n"
+                    "- Or ask any question!")
+        elif incoming_msg in ['menu', 'products', 'catalog']:
+            reply = ("📋 Our Product Categories:\n\n"
+                    "1. POULTRY 🐔\n"
+                    "2. LAMB 🐑\n"
+                    "3. BEEF 🐄\n"
+                    "4. GROCERIES 🛒\n"
+                    "5. FROZEN MEATS ❄️\n"
+                    "6. EXOTIC MEATS\n"
+                    "7. MARINATED MEATS\n\n"
+                    "Reply with a category name or product name for details!")
+        elif 'delivery' in incoming_msg:
+            reply = ("🚚 Delivery Information:\n\n"
+                    "• Mainland UK delivery 7 days/week\n"
+                    "• £9.99 delivery for orders under £100\n"
+                    "• FREE delivery for orders £100+\n"
+                    "• Next day delivery for orders before 9am\n"
+                    "• Click & Collect available after 5pm next day")
+        elif 'contact' in incoming_msg or 'phone' in incoming_msg:
+            reply = ("📞 Contact Us:\n"
+                    "Phone: 0208 908 9440\n"
+                    "Email: sales@tariqhalalmeats.com\n"
+                    "Hours: Mon-Sun 9am-9pm")
+        elif 'branches' in incoming_msg or 'locations' in incoming_msg:
+            reply = ("🏪 Our Branches:\n\n"
+                    "• Cardiff: 104-106 Albany Road\n"
+                    "• Crawley: 33 Queensway\n"
+                    "• Croydon: 89 London Road\n"
+                    "• Finsbury Park: 258 Seven Sisters Road\n"
+                    "• And 15+ more locations across UK\n\n"
+                    "Full list at tariqhalalmeats.com")
         else:
-            ai_response = generate_ai_response(message)
-            reply = ai_response if ai_response else (
-                "Sorry, I couldn't process your request. "
-                "Please call ☎️ 0208 908 9440 for assistance."
-            )
+            # 1. First try to find matching products
+            product_results = find_products(incoming_msg)
+            if product_results:
+                response = ["🔎 We found these matching products:"]
+                for category, items in product_results.items():
+                    response.append(f"\n*{category}*")
+                    response.extend(f"- {name}: {price}" for name, price in items)
+                response.append("\nNeed anything else?")
+                reply = "\n".join(response)
+            # 2. Fall back to AI for general questions
+            else:
+                ai_response = generate_ai_response(incoming_msg)
+                reply = ai_response if ai_response else (
+                    "Sorry, I couldn't find information about that.\n"
+                    "Please call ☎️ 0208 908 9440 for assistance."
+                )
 
         # Send response
         logger.info(f"Sending response: {reply[:100]}...")
-        resp = MessagingResponse()
         resp.message(reply)
         return str(resp)
 
