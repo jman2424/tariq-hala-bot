@@ -1,112 +1,72 @@
+from dotenv import load_dotenv
+load_dotenv()
+
+from flask import Flask, request, jsonify
+from twilio.twiml.messaging_response import MessagingResponse
+from twilio.request_validator import RequestValidator
+from openai import OpenAI
+from flask_caching import Cache
+import os
+import traceback
+import logging
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+# Initialize Flask app FIRST
+app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize cache
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
+
+# Initialize rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+# Load API keys
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+
+# ========== REST OF YOUR CODE (PRODUCT CATALOG, STORE INFO, HELPER FUNCTIONS) ==========
+# [Keep all your existing code for these sections]
+
+# ========== ROUTES ==========
 @app.route("/whatsapp", methods=["POST"])
 @limiter.limit("5 per minute")
 @cache.cached(timeout=300, query_string=True)
 def handle_whatsapp_message():
-    """Process incoming WhatsApp messages"""
-    try:
-        # Validate Twilio signature
-        validator = RequestValidator(TWILIO_AUTH_TOKEN)
-        if not validator.validate(
-            request.url,
-            request.form,
-            request.headers.get('X-Twilio-Signature', '')
-        ):
-            logger.warning("Invalid Twilio signature")
-            return "Unauthorized", 403
+    # [Keep your existing handle_whatsapp_message implementation]
+    pass
 
-        # Get and validate message
-        incoming_msg = request.values.get('Body', '').strip().lower()
-        if not incoming_msg:
-            return "Empty message", 400
+@app.route("/whatsapp/status", methods=["POST"])
+def handle_status_update():
+    # [Keep your existing status update handler]
+    pass
 
-        logger.info(f"Received raw message: '{request.values.get('Body', '')}'")
-        logger.info(f"Processed message (lowercase): '{incoming_msg}'")
+@app.route("/health")
+def health_check():
+    # [Keep your existing health check]
+    pass
 
-        # Initialize response
-        resp = MessagingResponse()
-        
-        # Debug: Log the type of message we're processing
-        logger.info(f"Processing message type: {type(incoming_msg)}")
-        
-        # Handle specific commands
-        if any(greeting in incoming_msg for greeting in ['hi', 'hello', 'hey']):
-            reply = ("🕌 Welcome to Tariq Halal Meats!\n\n"
-                    "You can ask about:\n"
-                    "- Products & prices 🛒\n"
-                    "- Delivery info 🚚\n"
-                    "- Store locations 🏪\n"
-                    "- Or ask any question!")
-            logger.info("Responding to greeting")
-            
-        elif any(cmd in incoming_msg for cmd in ['menu', 'products', 'catalog']):
-            reply = ("📋 Our Product Categories:\n\n"
-                    "1. POULTRY 🐔\n"
-                    "2. LAMB 🐑\n"
-                    "3. BEEF 🐄\n"
-                    "4. GROCERIES 🛒\n"
-                    "5. FROZEN MEATS ❄️\n"
-                    "6. EXOTIC MEATS\n"
-                    "7. MARINATED MEATS\n\n"
-                    "Reply with a category name or product name for details!")
-            logger.info("Responding to menu request")
-            
-        elif 'delivery' in incoming_msg:
-            reply = ("🚚 Delivery Information:\n\n"
-                    "• Mainland UK delivery 7 days/week\n"
-                    "• £9.99 delivery for orders under £100\n"
-                    "• FREE delivery for orders £100+\n"
-                    "• Next day delivery for orders before 9am\n"
-                    "• Click & Collect available after 5pm next day")
-            logger.info("Responding to delivery inquiry")
-            
-        elif 'contact' in incoming_msg or 'phone' in incoming_msg:
-            reply = ("📞 Contact Us:\n"
-                    "Phone: 0208 908 9440\n"
-                    "Email: sales@tariqhalalmeats.com\n"
-                    "Hours: Mon-Sun 9am-9pm")
-            logger.info("Responding to contact request")
-            
-        elif 'branches' in incoming_msg or 'locations' in incoming_msg:
-            reply = ("🏪 Our Branches:\n\n"
-                    "• Cardiff: 104-106 Albany Road\n"
-                    "• Crawley: 33 Queensway\n"
-                    "• Croydon: 89 London Road\n"
-                    "• Finsbury Park: 258 Seven Sisters Road\n"
-                    "• And 15+ more locations across UK\n\n"
-                    "Full list at tariqhalalmeats.com")
-            logger.info("Responding to branches request")
-            
-        else:
-            # 1. First try to find matching products
-            logger.info("Attempting product search")
-            product_results = find_products(incoming_msg)
-            
-            if product_results:
-                logger.info(f"Found {sum(len(v) for v in product_results.values())} matching products")
-                response = ["🔎 We found these matching products:"]
-                for category, items in product_results.items():
-                    response.append(f"\n*{category}*")
-                    response.extend(f"- {name}: {price}" for name, price in items)
-                response.append("\nNeed anything else?")
-                reply = "\n".join(response)
-            else:
-                # 2. Fall back to AI for general questions
-                logger.info("No products found, trying AI response")
-                ai_response = generate_ai_response(incoming_msg)
-                if ai_response:
-                    logger.info("AI response generated successfully")
-                    reply = ai_response
-                else:
-                    logger.warning("AI response failed")
-                    reply = ("Sorry, I couldn't find information about that.\n"
-                            "Please call ☎️ 0208 908 9440 for assistance.")
+@app.route("/")
+def home():
+    """Simple root endpoint"""
+    return "🟢 Tariq Halal Meats WhatsApp Bot is Online"
 
-        # Send response
-        logger.info(f"Sending response (first 100 chars): {reply[:100]}...")
-        resp.message(reply)
-        return str(resp)
-
-    except Exception as e:
-        logger.error(f"Error processing message: {str(e)}")
-        traceback.print_exc()
-        return "Server Error", 500
+# ========== APPLICATION ENTRY POINT ==========
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=os.getenv('DEBUG', 'false').lower() == 'true'
+    )
