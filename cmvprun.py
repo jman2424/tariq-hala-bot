@@ -434,6 +434,36 @@ def handle_whatsapp_message():
         if not incoming_msg:
             return "Empty message", 400
 
+        logger.info(f"Received raw message: '{request.values.get('Body', '')}'")
+        logger.info(f"Processed message (lowercase): '{incoming_msg}'")
+
+        # Initialize response
+        resp = MessagingResponse()
+        
+        # Debug: Log the type of message we're processing
+        logger.info(f"Processing message type: {type(incoming_msg)}")
+        
+        # Handle specific commands
+        if any(greeting in incoming_msg for greeting in ['hi', 'hello', 'hey']):
+            reply = ("🕌 Welcome to Tariq Halal Meats!\n\n"
+                   :
+    """Process incoming WhatsApp messages"""
+    try:
+        # Validate Twilio signature
+        validator = RequestValidator(TWILIO_AUTH_TOKEN)
+        if not validator.validate(
+            request.url,
+            request.form,
+            request.headers.get('X-Twilio-Signature', '')
+        ):
+            logger.warning("Invalid Twilio signature")
+            return "Unauthorized", 403
+
+        # Get and validate message
+        incoming_msg = request.values.get('Body', '').strip().lower()
+        if not incoming_msg:
+            return "Empty message", 400
+
         logger.info(f"Received message: {incoming_msg}")
 
         # Initialize response
