@@ -80,8 +80,17 @@ def find_products(search_term):
     search_term = search_term.lower().strip()
     results = {}
 
-    for category, products in PRODUCT_CATALOG.items():
-        matched_products = [(product, price) for product, price in products.items() if search_term in product.lower()]
+    for entry in PRODUCT_CATALOG:
+        category = entry["category"]
+        products = entry["items"]
+        matched_products = []
+
+        for product in products:
+            name = product["name"].lower()
+            price = product["price"]
+            if search_term in name:
+                matched_products.append((product["name"], price))
+
         if matched_products:
             results[category] = matched_products
 
