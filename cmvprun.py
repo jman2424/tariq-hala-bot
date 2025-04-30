@@ -76,6 +76,9 @@ PRODUCT_CATALOG = [
 ]
 # ========== HELPER FUNCTIONS ==========
 
+from functools import lru_cache
+
+@lru_cache(maxsize=128)  # Cache the search results for up to 128 unique search terms
 def find_products(search_term):
     search_term = search_term.lower().strip()
     results = {}
@@ -97,36 +100,37 @@ def find_products(search_term):
     return results
 
 def generate_ai_response(user_query):
+    dynamic_prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
+    if "delivery" in user_query.lower():
+        dynamic_prompt += " Focus on providing delivery-related information."
+    elif "hours" in user_query.lower():
+        dynamic_prompt += " Provide the business hours."
+    elif "cost" in user_query.lower() and "chicken" in user_query.lower():
+        dynamic_prompt += " Provide the cost of 1 kg of chicken."
+    else:
+        dynamic_prompt += " Provide concise and relevant answers from the product list or business information."
+
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a helpful WhatsApp assistant for Tariq Halal Meats UK. "
-                        "Use only the provided store information to answer. "
-                        "Be concise (1-2 short paragraphs max). "
-                        "For product prices, direct to the price list. "
-                        "If unsure, ask them to call 0208 908 9440."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"
-                }
-            ],
+            messages=[{
+                "role": "system",
+                "content": dynamic_prompt
+            }, {
+                "role": "user",
+                "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"
+            }],
             temperature=0.3,
             max_tokens=150
         )
         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"AI Error: {str(e)}")
-        return None
+        return "Sorry, I encountered an issue while processing your request. Please try again later."
 
 # ========== WHATSAPP ROUTE ==========
+
 @app.route("/whatsapp", methods=["POST"])
-@limiter.limit("5 per minute")
 def handle_whatsapp_message():
     try:
         # Validate Twilio request
@@ -155,10 +159,10 @@ def handle_whatsapp_message():
             reply = "\n".join(response_lines)
         else:
             ai_response = generate_ai_response(message)
-            reply = ai_response or (
-                "Sorry, I couldn't process your request. "
-                "Please call ☎️ 0208 908 9440 for assistance."
-            )
+            if not ai_response:
+                reply = "Sorry, I couldn't find any products matching your query. Could you please provide more details or try a different term?"
+            else:
+                reply = ai_response
 
         logger.info(f"Sending response: {reply[:100]}...")
         twiml = MessagingResponse()
@@ -171,6 +175,7 @@ def handle_whatsapp_message():
         return "Server Error", 500
 
 # ========== STATUS ROUTE ==========
+
 @app.route("/whatsapp/status", methods=["POST"])
 def handle_status_update():
     status = request.values.get('MessageStatus', '')
@@ -179,6 +184,7 @@ def handle_status_update():
     return "OK", 200
 
 # ========== HEALTH CHECK ==========
+
 @app.route("/health")
 def health_check():
     return jsonify({
@@ -190,11 +196,13 @@ def health_check():
     })
 
 # ========== HOME ==========
+
 @app.route("/")
 def home():
     return "🟢 Tariq Halal Meats WhatsApp Bot is Online"
 
 # ========== RUN SERVER ==========
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(
