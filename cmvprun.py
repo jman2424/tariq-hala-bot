@@ -8,7 +8,7 @@ from flask_limiter.util import get_remote_address
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-from product_catalog import product_catalog
+from product_catalog import product_catalog  # ✅ Corrected import
 
 
 # ========== CONFIGURATION ==========
@@ -25,16 +25,15 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# ========== COMPLETE PRODUCT CATALOG WITH PRICES ==========
-
+# ========== PRODUCT SEARCH FUNCTION ==========
 from functools import lru_cache
 
-@lru_cache(maxsize=128)  # Cache the search results for up to 128 unique search terms
+@lru_cache(maxsize=128)
 def find_products(search_term):
     search_term = search_term.lower().strip()
     results = {}
 
-    for entry in PRODUCT_CATALOG:
+    for entry in product_catalog:  # ✅ Fixed variable name
         category = entry["category"]
         products = entry["items"]
         matched_products = []
@@ -50,6 +49,9 @@ def find_products(search_term):
 
     return results
 
+# ========== AI RESPONSE FUNCTION ==========
+
+# You need to make sure STORE_INFO is defined somewhere before using this function!
 def generate_ai_response(user_query):
     dynamic_prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
     if "delivery" in user_query.lower():
@@ -84,7 +86,6 @@ def generate_ai_response(user_query):
 @app.route("/whatsapp", methods=["POST"])
 def handle_whatsapp_message():
     try:
-        # Validate Twilio request
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
         if not validator.validate(
             request.url,
@@ -135,7 +136,6 @@ def handle_status_update():
     return "OK", 200
 
 # ========== HEALTH CHECK ==========
-
 @app.route("/health")
 def health_check():
     return jsonify({
@@ -147,13 +147,11 @@ def health_check():
     })
 
 # ========== HOME ==========
-
 @app.route("/")
 def home():
     return "🟢 Tariq Halal Meats WhatsApp Bot is Online"
 
 # ========== RUN SERVER ==========
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(
