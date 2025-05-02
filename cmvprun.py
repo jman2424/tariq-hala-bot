@@ -8,7 +8,8 @@ from flask_limiter.util import get_remote_address
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-from product_catalog import product_catalog  # ✅ Corrected import
+from cmvp import product_catalog, store_info
+
 
 
 # ========== CONFIGURATION ==========
