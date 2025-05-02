@@ -8,9 +8,7 @@ from flask_limiter.util import get_remote_address
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-from cmvp import product_catalog, store_info
-
-
+from cmvp import product_catalog, store_info  # Importing combined info and catalog
 
 # ========== CONFIGURATION ==========
 app = Flask(__name__)
@@ -23,7 +21,6 @@ logger = logging.getLogger(__name__)
 # ========== EXTERNAL KEYS ==========
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== PRODUCT SEARCH FUNCTION ==========
@@ -34,7 +31,7 @@ def find_products(search_term):
     search_term = search_term.lower().strip()
     results = {}
 
-    for entry in product_catalog:  # ✅ Fixed variable name
+    for entry in product_catalog:
         category = entry["category"]
         products = entry["items"]
         matched_products = []
@@ -51,8 +48,6 @@ def find_products(search_term):
     return results
 
 # ========== AI RESPONSE FUNCTION ==========
-
-# You need to make sure STORE_INFO is defined somewhere before using this function!
 def generate_ai_response(user_query):
     dynamic_prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
     if "delivery" in user_query.lower():
@@ -67,13 +62,10 @@ def generate_ai_response(user_query):
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{
-                "role": "system",
-                "content": dynamic_prompt
-            }, {
-                "role": "user",
-                "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"
-            }],
+            messages=[
+                {"role": "system", "content": dynamic_prompt},
+                {"role": "user", "content": f"Business Info:\n{store_info}\n\nCustomer Question: {user_query}"}
+            ],
             temperature=0.3,
             max_tokens=150
         )
@@ -83,7 +75,6 @@ def generate_ai_response(user_query):
         return "Sorry, I encountered an issue while processing your request. Please try again later."
 
 # ========== WHATSAPP ROUTE ==========
-
 @app.route("/whatsapp", methods=["POST"])
 def handle_whatsapp_message():
     try:
@@ -128,7 +119,6 @@ def handle_whatsapp_message():
         return "Server Error", 500
 
 # ========== STATUS ROUTE ==========
-
 @app.route("/whatsapp/status", methods=["POST"])
 def handle_status_update():
     status = request.values.get('MessageStatus', '')
