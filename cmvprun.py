@@ -1,6 +1,7 @@
 import os
 import traceback
 import logging
+from functools import lru_cache
 from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from flask_limiter import Limiter
@@ -8,7 +9,13 @@ from flask_limiter.util import get_remote_address
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-from cmvp import product_catalog, store_info  # Importing combined info and catalog
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Import your business info and product data
+from cmvp import product_catalog, store_info as STORE_INFO
 
 # ========== CONFIGURATION ==========
 app = Flask(__name__)
@@ -19,26 +26,25 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ========== EXTERNAL KEYS ==========
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== PRODUCT SEARCH FUNCTION ==========
-from functools import lru_cache
-
 @lru_cache(maxsize=128)
 def find_products(search_term):
     search_term = search_term.lower().strip()
     results = {}
 
     for entry in product_catalog:
-        category = entry["category"]
-        products = entry["items"]
+        category = entry.get("category", "Unknown")
+        products = entry.get("items", [])
         matched_products = []
 
         for product in products:
-            name = product["name"].lower()
-            price = product["price"]
+            name = product.get("name", "").lower()
+            price = product.get("price", "N/A")
             if search_term in name:
                 matched_products.append((product["name"], price))
 
@@ -49,22 +55,23 @@ def find_products(search_term):
 
 # ========== AI RESPONSE FUNCTION ==========
 def generate_ai_response(user_query):
-    dynamic_prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
+    prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
+
     if "delivery" in user_query.lower():
-        dynamic_prompt += " Focus on providing delivery-related information."
+        prompt += " Focus on providing delivery-related information."
     elif "hours" in user_query.lower():
-        dynamic_prompt += " Provide the business hours."
+        prompt += " Provide the business hours."
     elif "cost" in user_query.lower() and "chicken" in user_query.lower():
-        dynamic_prompt += " Provide the cost of 1 kg of chicken."
+        prompt += " Provide the cost of 1 kg of chicken."
     else:
-        dynamic_prompt += " Provide concise and relevant answers from the product list or business information."
+        prompt += " Provide concise and relevant answers from the product list or business information."
 
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": dynamic_prompt},
-                {"role": "user", "content": f"Business Info:\n{store_info}\n\nCustomer Question: {user_query}"}
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"}
             ],
             temperature=0.3,
             max_tokens=150
@@ -103,10 +110,7 @@ def handle_whatsapp_message():
             reply = "\n".join(response_lines)
         else:
             ai_response = generate_ai_response(message)
-            if not ai_response:
-                reply = "Sorry, I couldn't find any products matching your query. Could you please provide more details or try a different term?"
-            else:
-                reply = ai_response
+            reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
 
         logger.info(f"Sending response: {reply[:100]}...")
         twiml = MessagingResponse()
