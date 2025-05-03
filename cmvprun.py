@@ -3,25 +3,25 @@ import traceback
 import logging
 from functools import lru_cache
 from flask import Flask, request, jsonify, Response
-from flask_caching import Cache  # Fixed import here
+from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-from dotenv import load_dotenv  # Fixed import here
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 # ✅ Import store info and product catalog
-from cmvp import store_info as STORE_INFO, product_catalog
+from store_info import store_info as STORE_INFO, product_catalog
 
 # ========== CONFIGURATION ==========
 
-app = Flask(__name__)  # Fixed __name__ here
+app = Flask(__name__)  # Corrected name to __name__
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)  # Fixed __name__ here
+logger = logging.getLogger(__name__)  # Corrected name to __name__
 
 # ========== EXTERNAL KEYS ==========
 
@@ -84,7 +84,7 @@ def generate_ai_response(user_query):
 
 # ========== WHATSAPP ROUTE ==========
 
-@app.route("/whatsapp", methods=["POST"])  # Fixed syntax here
+@app.route("/whatsapp", methods=["POST"])
 def handle_whatsapp_message():
     try:
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
@@ -126,7 +126,7 @@ def handle_whatsapp_message():
 
 # ========== STATUS ROUTE ==========
 
-@app.route("/whatsapp/status", methods=["POST"])  # Fixed syntax here
+@app.route("/whatsapp/status", methods=["POST"])
 def handle_status_update():
     status = request.values.get('MessageStatus', '')
     message_sid = request.values.get('MessageSid', '')
@@ -153,7 +153,7 @@ def home():
 
 # ========== RUN SERVER ==========
 
-if __name__ == "__main__":  # Fixed __name__ here
+if __name__ == "__main__":  # Corrected __name__ to __main__
     port = int(os.environ.get("PORT", 5000))
     app.run(
         host="0.0.0.0",
