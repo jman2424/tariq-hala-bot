@@ -3,168 +3,160 @@ import traceback
 import logging
 from functools import lru_cache
 from flask import Flask, request, jsonify, Response
-from flask\_caching import Cache
-from twilio.request\_validator import RequestValidator
-from twilio.twiml.messaging\_response import MessagingResponse
+from flask_caching import Cache  # Fixed import here
+from twilio.request_validator import RequestValidator
+from twilio.twiml.messaging_response import MessagingResponse
 from openai import OpenAI
-from dotenv import load\_dotenv
+from dotenv import load_dotenv  # Fixed import here
 
 # Load environment variables from .env file
-
-load\_dotenv()
+load_dotenv()
 
 # ✅ Import store info and product catalog
-
-from cmvp import store\_info as STORE\_INFO, product\_catalog
+from cmvp import store_info as STORE_INFO, product_catalog
 
 # ========== CONFIGURATION ==========
 
-app = Flask(**name**)
-cache = Cache(app, config={'CACHE\_TYPE': 'SimpleCache'})
+app = Flask(__name__)  # Fixed __name__ here
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(**name**)
+logger = logging.getLogger(__name__)  # Fixed __name__ here
 
 # ========== EXTERNAL KEYS ==========
 
-TWILIO\_AUTH\_TOKEN = os.getenv("TWILIO\_AUTH\_TOKEN")
-OPENAI\_API\_KEY = os.getenv("OPENAI\_API\_KEY")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-client = OpenAI(api\_key=OPENAI\_API\_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== PRODUCT SEARCH FUNCTION ==========
 
-@lru\_cache(maxsize=128)
-def find\_products(search\_term):
-search\_term = search\_term.lower().strip()
-results = {}
+@lru_cache(maxsize=128)
+def find_products(search_term):
+    search_term = search_term.lower().strip()
+    results = {}
 
-```
-for entry in product_catalog:
-    category = entry.get("category", "Unknown")
-    products = entry.get("items", [])
-    matched_products = []
+    for entry in product_catalog:
+        category = entry.get("category", "Unknown")
+        products = entry.get("items", [])
+        matched_products = []
 
-    for product in products:
-        name = product.get("name", "").lower()
-        price = product.get("price", "N/A")
-        if search_term in name:
-            matched_products.append((product["name"], price))
+        for product in products:
+            name = product.get("name", "").lower()
+            price = product.get("price", "N/A")
+            if search_term in name:
+                matched_products.append((product["name"], price))
 
-    if matched_products:
-        results[category] = matched_products
+        if matched_products:
+            results[category] = matched_products
 
-return results
-```
+    return results
 
 # ========== AI RESPONSE FUNCTION ==========
 
-def generate\_ai\_response(user\_query):
-prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
+def generate_ai_response(user_query):
+    prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
 
-```
-if "delivery" in user_query.lower():
-    prompt += " Focus on providing delivery-related information."
-elif "hours" in user_query.lower():
-    prompt += " Provide the business hours."
-elif "cost" in user_query.lower() and "chicken" in user_query.lower():
-    prompt += " Provide the cost of 1 kg of chicken."
-else:
-    prompt += " Provide concise and relevant answers from the product list or business information."
+    if "delivery" in user_query.lower():
+        prompt += " Focus on providing delivery-related information."
+    elif "hours" in user_query.lower():
+        prompt += " Provide the business hours."
+    elif "cost" in user_query.lower() and "chicken" in user_query.lower():
+        prompt += " Provide the cost of 1 kg of chicken."
+    else:
+        prompt += " Provide concise and relevant answers from the product list or business information."
 
-try:
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"}
-        ],
-        temperature=0.3,
-        max_tokens=150
-    )
-    return response.choices[0].message.content
-except Exception as e:
-    logger.error(f"AI Error: {str(e)}")
-    return "Sorry, I encountered an issue while processing your request. Please try again later."
-```
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"}
+            ],
+            temperature=0.3,
+            max_tokens=150
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"AI Error: {str(e)}")
+        return "Sorry, I encountered an issue while processing your request. Please try again later."
 
 # ========== WHATSAPP ROUTE ==========
 
-@app.route("/whatsapp", methods=\["POST"])
-def handle\_whatsapp\_message():
-try:
-validator = RequestValidator(TWILIO\_AUTH\_TOKEN)
-if not validator.validate(
-request.url,
-request.form,
-request.headers.get('X-Twilio-Signature', '')
-):
-logger.warning("Invalid Twilio signature")
-return "Unauthorized", 403
+@app.route("/whatsapp", methods=["POST"])  # Fixed syntax here
+def handle_whatsapp_message():
+    try:
+        validator = RequestValidator(TWILIO_AUTH_TOKEN)
+        if not validator.validate(
+            request.url,
+            request.form,
+            request.headers.get('X-Twilio-Signature', '')
+        ):
+            logger.warning("Invalid Twilio signature")
+            return "Unauthorized", 403
 
-```
-    message = request.values.get('Body', '').strip()
-    if not message:
-        return "Empty message", 400
+        message = request.values.get('Body', '').strip()
+        if not message:
+            return "Empty message", 400
 
-    logger.info(f"Received message: {message}")
+        logger.info(f"Received message: {message}")
 
-    product_results = find_products(message)
-    if product_results:
-        response_lines = ["We found these matching products:"]
-        for category, items in product_results.items():
-            response_lines.append(f"\n*{category}*")
-            response_lines.extend(f"- {name}: {price}" for name, price in items)
-        response_lines.append("\nNeed anything else?")
-        reply = "\n".join(response_lines)
-    else:
-        ai_response = generate_ai_response(message)
-        reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
+        product_results = find_products(message)
+        if product_results:
+            response_lines = ["We found these matching products:"]
+            for category, items in product_results.items():
+                response_lines.append(f"\n*{category}*")
+                response_lines.extend(f"- {name}: {price}" for name, price in items)
+            response_lines.append("\nNeed anything else?")
+            reply = "\n".join(response_lines)
+        else:
+            ai_response = generate_ai_response(message)
+            reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
 
-    logger.info(f"Sending response: {reply[:100]}...")
-    twiml = MessagingResponse()
-    twiml.message(reply)
-    return Response(str(twiml), mimetype="application/xml")
+        logger.info(f"Sending response: {reply[:100]}...")
+        twiml = MessagingResponse()
+        twiml.message(reply)
+        return Response(str(twiml), mimetype="application/xml")
 
-except Exception as e:
-    logger.error(f"Error processing message: {str(e)}")
-    traceback.print_exc()
-    return "Server Error", 500
-```
+    except Exception as e:
+        logger.error(f"Error processing message: {str(e)}")
+        traceback.print_exc()
+        return "Server Error", 500
 
 # ========== STATUS ROUTE ==========
 
-@app.route("/whatsapp/status", methods=\["POST"])
-def handle\_status\_update():
-status = request.values.get('MessageStatus', '')
-message\_sid = request.values.get('MessageSid', '')
-logger.info(f"Message status update - SID: {message\_sid}, Status: {status}")
-return "OK", 200
+@app.route("/whatsapp/status", methods=["POST"])  # Fixed syntax here
+def handle_status_update():
+    status = request.values.get('MessageStatus', '')
+    message_sid = request.values.get('MessageSid', '')
+    logger.info(f"Message status update - SID: {message_sid}, Status: {status}")
+    return "OK", 200
 
 # ========== HEALTH CHECK ==========
 
 @app.route("/health")
-def health\_check():
-return jsonify({
-"status": "operational",
-"services": {
-"openai": bool(client.api\_key),
-"twilio": bool(TWILIO\_AUTH\_TOKEN)
-}
-})
+def health_check():
+    return jsonify({
+        "status": "operational",
+        "services": {
+            "openai": bool(client.api_key),
+            "twilio": bool(TWILIO_AUTH_TOKEN)
+        }
+    })
 
 # ========== HOME ==========
 
 @app.route("/")
 def home():
-return "🟢 Tariq Halal Meats WhatsApp Bot is Online"
+    return "🟢 Tariq Halal Meats WhatsApp Bot is Online"
 
 # ========== RUN SERVER ==========
 
-if **name** == "**main**":
-port = int(os.environ.get("PORT", 5000))
-app.run(
-host="0.0.0.0",
-port=port,
-debug=os.getenv("DEBUG", "false").lower() == "true"
-)  make this again so it fixes all my issues
+if __name__ == "__main__":  # Fixed __name__ here
+    port = int(os.environ.get("PORT", 5000))
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=os.getenv("DEBUG", "false").lower() == "true"
+    )
