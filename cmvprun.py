@@ -16,6 +16,7 @@ load_dotenv()
 from store_info import store_info as STORE_INFO
 from product_catalog import product_catalog
 
+
 # ========== CONFIGURATION ==========
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
