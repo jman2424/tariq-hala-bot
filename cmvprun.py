@@ -14,7 +14,7 @@ load_dotenv()
 
 # ✅ Import store info and product catalog from files in the same folder
 from store_info import store_info as STORE_INFO
-from product_catalog import product_catalog
+from product_catalog import PRODUCT_CATALOG
 
 
 # ========== CONFIGURATION ==========
