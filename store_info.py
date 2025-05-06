@@ -1,5 +1,5 @@
 # ========== COMPLETE STORE INFORMATION ==========
-store_info = """Your Store Info Here"""
+store_info = """
 
 STORE_INFO = """
 Tariq Halal Meats Delivery Info:
