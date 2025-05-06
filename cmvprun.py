@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ========== EXTERNAL KEYS ==========
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== PRODUCT SEARCH FUNCTION ==========
