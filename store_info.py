@@ -1,24 +1,21 @@
-# ========== COMPLETE STORE INFORMATION ==========
 store_info = """
-
-STORE_INFO = """
 Tariq Halal Meats Delivery Info:
 
-❌ No delivery to Isle of Man, Isle of Wight, Jersey.
+No delivery to Isle of Man, Isle of Wight, Jersey.
 
-✅ Mainland UK delivery 7 days a week.
+Mainland UK delivery 7 days a week.
 
-🚚 Orders under £100: £9.99 delivery fee.
+Orders under £100: £9.99 delivery fee.
 
-🎁 Orders £100+: Free delivery.
+Orders £100+: Free delivery.
 
-📦 Delivered in insulated boxes with ice packs.
+Delivered in insulated boxes with ice packs.
 
-⏱ Orders placed before 9am (Mon-Sun) are delivered next day.
+Orders placed before 9am (Mon-Sun) are delivered next day.
 
-🕐 Click & Collect (after 5pm next day if ordered before 1pm).
+Click & Collect (after 5pm next day if ordered before 1pm).
 
-📧 Contact: sales@tariqhalalmeats.com | ☎️ 0208 908 9440
+Contact: sales@tariqhalalmeats.com | 0208 908 9440
 
 Delivery Schedule:
 Monday before 9am: Arrives Tuesday
@@ -30,12 +27,12 @@ Saturday before 9am: Arrives Sunday
 Sunday before 9am: Arrives Monday
 
 Customer Service:
-💬 Complaints reviewed in 1-2 working days.
-📩 Email support: info@tariqhalalmeats.com
-📦 No returns due to perishable nature of goods.
+Complaints reviewed in 1-2 working days.
+Email support: info@tariqhalalmeats.com
+No returns due to perishable nature of goods.
 
 Halal Certification:
-✅ All products certified Halal by reputable bodies.
+All products certified Halal by reputable bodies.
 
 Branches:
 Cardiff: 104-106 Albany Road, CF24 3RT | 02920 485 569
