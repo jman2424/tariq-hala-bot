@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
-from openai import OpenAI
+import openai
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -25,9 +25,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ========== EXTERNAL KEYS ==========
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
+TWILIO_AUTH_TOKEN = os.getenv("1d9ec05a10a55e999a6ef17e078161cb")
+OPENAI_API_KEY = os.getenv("
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== PRODUCT SEARCH FUNCTION ==========
