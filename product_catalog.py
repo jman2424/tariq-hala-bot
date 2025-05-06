@@ -1,4 +1,4 @@
-PRODUCT_CATALOG = {
+PRODUCT_CATALOG = [
     "POULTRY": {
         "5 Boiler (Hen)": "£19.99",
         "Chicken Drumsticks (Skin Off)": "£6.99",
@@ -257,5 +257,5 @@ PRODUCT_CATALOG = {
             "COMBO - Greek Chicken & Lamb Gyros (kebab) 1kg": "£12.99"
         }
     }
-}
+    ]
 
