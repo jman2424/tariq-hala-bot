@@ -36,16 +36,12 @@ def find_products(search_term):
     search_term = search_term.lower().strip()
     results = {}
 
-    for entry in PRODUCT_CATALOG:
-        category = entry.get("category", "Unknown")
-        products = entry.get("items", [])
+    for category, products in PRODUCT_CATALOG.items():
         matched_products = []
 
-        for product in products:
-            name = product.get("name", "").lower()
-            price = product.get("price", "N/A")
-            if search_term in name:
-                matched_products.append((product["name"], price))
+        for name, price in products.items():
+            if search_term in name.lower():
+                matched_products.append((name, price))
 
         if matched_products:
             results[category] = matched_products
