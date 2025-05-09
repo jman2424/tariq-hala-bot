@@ -6,8 +6,10 @@ from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
-import openai
 from dotenv import load_dotenv
+
+# ✅ NEW: Use the OpenAI client for openai>=1.0.0
+from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,8 +29,8 @@ logger = logging.getLogger(__name__)
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Initialize OpenAI
-openai.api_key = OPENAI_API_KEY
+# ✅ Initialize OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== PRODUCT SEARCH FUNCTION ========== 
 @lru_cache(maxsize=128)
@@ -62,7 +64,7 @@ def generate_ai_response(user_query):
         prompt += " Provide concise and relevant answers from the product list or business information."
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": prompt},
