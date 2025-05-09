@@ -62,16 +62,14 @@ def generate_ai_response(user_query):
         prompt += " Provide concise and relevant answers from the product list or business information."
 
     try:
-        response = openai.chat.completions.create(
+        # Explicitly create the OpenAI API request without passing unwanted parameters
+        response = openai.Completion.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Business Info:\n{STORE_INFO}\n\nCustomer Question: {user_query}"}
-            ],
-            temperature=0.3,
-            max_tokens=150
+            prompt=prompt + f"\nCustomer Question: {user_query}",
+            max_tokens=150,
+            temperature=0.3
         )
-        return response.choices[0].message.content
+        return response.choices[0].text.strip()
     except Exception as e:
         logger.error(f"AI Error: {str(e)}")
         return "Sorry, I encountered an issue while processing your request. Please try again later."
