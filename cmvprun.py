@@ -6,10 +6,8 @@ from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
+from openai import OpenAI  # ✅ Correct import for SDK v1.77.0
 from dotenv import load_dotenv
-
-# ✅ NEW: Use the OpenAI client for openai>=1.0.0
-from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
@@ -18,21 +16,21 @@ load_dotenv()
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# ========== CONFIGURATION ========== 
+# ========== CONFIGURATION ==========
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ========== EXTERNAL KEYS ========== 
+# ========== EXTERNAL KEYS ==========
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # ✅ Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# ========== PRODUCT SEARCH FUNCTION ========== 
+# ========== PRODUCT SEARCH FUNCTION ==========
 @lru_cache(maxsize=128)
 def find_products(search_term):
     search_term = search_term.lower().strip()
@@ -50,7 +48,7 @@ def find_products(search_term):
 
     return results
 
-# ========== AI RESPONSE FUNCTION ========== 
+# ========== AI RESPONSE FUNCTION ==========
 def generate_ai_response(user_query):
     prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
 
@@ -78,7 +76,7 @@ def generate_ai_response(user_query):
         logger.error(f"AI Error: {str(e)}")
         return "Sorry, I encountered an issue while processing your request. Please try again later."
 
-# ========== WHATSAPP ROUTE ========== 
+# ========== WHATSAPP ROUTE ==========
 @app.route("/whatsapp", methods=["POST"])
 def handle_whatsapp_message():
     try:
@@ -119,7 +117,7 @@ def handle_whatsapp_message():
         traceback.print_exc()
         return "Server Error", 500
 
-# ========== STATUS ROUTE ========== 
+# ========== STATUS ROUTE ==========
 @app.route("/whatsapp/status", methods=["POST"])
 def handle_status_update():
     status = request.values.get('MessageStatus', '')
@@ -127,7 +125,7 @@ def handle_status_update():
     logger.info(f"Message status update - SID: {message_sid}, Status: {status}")
     return "OK", 200
 
-# ========== HEALTH CHECK ========== 
+# ========== HEALTH CHECK ==========
 @app.route("/health")
 def health_check():
     return jsonify({
@@ -138,12 +136,12 @@ def health_check():
         }
     })
 
-# ========== HOME ========== 
+# ========== HOME ==========
 @app.route("/")
 def home():
     return "🟢 Tariq Halal Meats WhatsApp Bot is Online"
 
-# ========== RUN SERVER LOCALLY ========== 
+# ========== RUN SERVER LOCALLY ==========
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(
