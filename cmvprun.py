@@ -50,7 +50,7 @@ def find_products(search_term):
 
 # ========== AI RESPONSE FUNCTION ==========
 def generate_ai_response(user_query):
-    prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK."
+    prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK who can help give information on delvery cost and other details to customers ."
 
     if "delivery" in user_query.lower():
         prompt += " Focus on providing delivery-related information."
