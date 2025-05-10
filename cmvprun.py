@@ -50,25 +50,36 @@ def find_products(search_term):
 
 # ========== AI RESPONSE FUNCTION ==========
 def generate_ai_response(user_query):
-    prompt = "You are a helpful WhatsApp assistant for Tariq Halal Meats UK who can help give information on delvery cost and other details to customers ."
+    # Combine all store info into a readable format
+    store_info_text = "\n".join(f"{key}: {value}" for key, value in STORE_INFO.items())
 
-    if "delivery" in user_query.lower():
-        prompt += " Focus on providing delivery-related information."
-    elif "hours" in user_query.lower():
-        prompt += " Provide the business hours."
-    elif "cost" in user_query.lower() and "chicken" in user_query.lower():
-        prompt += " Provide the cost of 1 kg of chicken."
-    else:
-        prompt += " Provide concise and relevant answers from the product list or business information."
+    # Convert product catalog into a readable format
+    product_lines = []
+    for category, products in PRODUCT_CATALOG.items():
+        product_lines.append(f"\n{category}:")
+        for name, price in products.items():
+            product_lines.append(f"- {name}: {price}")
+    product_catalog_text = "\n".join(product_lines)
+
+    # System prompt includes both store info and product catalog
+    system_message = (
+        "You are a helpful WhatsApp assistant for Tariq Halal Meats UK. "
+        "Answer customer questions clearly and concisely. Use the information below:\n\n"
+        "STORE INFO:\n"
+        f"{store_info_text}\n\n"
+        "PRODUCT CATALOG:\n"
+        f"{product_catalog_text}\n\n"
+        "Always be friendly and helpful. If a question is about delivery, prices, store hours, or specific product names, use the info provided above."
+    )
 
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": prompt},
+                {"role": "system", "content": system_message},
                 {"role": "user", "content": user_query}
             ],
-            max_tokens=150,
+            max_tokens=300,
             temperature=0.3
         )
         return response.choices[0].message["content"].strip()
