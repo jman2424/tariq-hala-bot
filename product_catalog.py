@@ -2,6 +2,7 @@ PRODUCT_CATALOG = {
     "POULTRY": {
         "5 Boiler (Hen)": "£19.99",
         "Baby Chicken": "£5.99",
+        "Beef & Black Pepper Cocktail Sausages": "£2.99",
         "Boiler (Hen)": "£4.99",
         "Chicken Breast": "£9.99",
         "Chicken Breakfast Sausages": "£2.99",
@@ -35,42 +36,126 @@ PRODUCT_CATALOG = {
         "Spatch Cock Chicken (1100G)": "£6.99",
         "Superchick American Style Fillet Burger": "£11.99",
         "Tandoori Chicken 1100-1200 Gms": "£6.99",
-        "Tariq Halal Traditional Beef Sausages (342g)": "£3.99",
-        "Veal Burger": "£2.99",
-        "Beef Burgers (4)": "£5.99",
-        "Chicken Burgers (4)": "£5.99"
+        "Tariq Halal Traditional Beef Sausages (with hint of pepper) 342g": "£3.99",
+        "Veal Burger": "£2.99"
     },
+
     "LAMB": {
         "3Kg Baby Lamb Mince Special": "£39.99",
+        "5Kg Mixed Goat": "£84.95",
         "Baby Lamb Back Chops": "£21.99",
         "Baby Lamb Boneless": "£24.99",
+        "Baby Lamb French Rack": "£34.95",
         "Baby Lamb Front Chops": "£23.99",
-        ...
+        "Baby Lamb Leg (1kg)": "£22.99",
+        "Baby Lamb Leg Mince": "£24.99",
+        "Baby Lamb Leg Steaks With Bone": "£21.99",
+        "Baby Lamb Leg Steaks Without Bone": "£24.99",
+        "Baby Lamb Mince (25% fat)": "£14.99",
+        "Baby Lamb Neck": "£14.99",
+        "Baby Lamb Ribs": "£14.99",
+        "Baby Lamb Shoulder": "£22.99",
+        "Baby Lamb Shoulder For Roasting 1.8-2.0 Kg (whole)": "£39.95",
+        "Baby Mixed Lamb": "£19.95",
+        "Boneless Mutton": "£16.99",
+        "Half Baby Lamb (10kg Net Differs)": "£159.99",
+        "Half Sheep (15Kg)": "£159.99",
+        "Haqeeqa Baby Lamb": "£350.00",
+        "Haqeeqa Sheep": "£350.00",
+        "Lamb Brain (Per Packet)": "£7.49",
+        "Lamb Feet (Paya 1)": "£1.29",
+        "Lamb Head Without Skin": "£4.99",
+        "Lamb Hearts": "£5.99",
+        "Lamb Kidneys": "£8.99",
+        "Lamb Liver": "£5.99",
+        "Lamb Testicles (Kapoorae)": "£7.99",
+        "Lamb Tongue": "£9.99",
+        "Lamb Tripe (Stomach)": "£2.00",
+        "Mixed Genuine 100% Goat": "£17.99",
+        "Mixed Mutton": "£12.99",
+        "Mutton Back Chops": "£14.99",
+        "Mutton Front Chops": "£14.99",
+        "Mutton Leg": "£14.99",
+        "Mutton Mince Up To 25% Fat": "£9.99",
+        "Mutton Neck": "£11.99",
+        "Mutton Ribs": "£11.99",
+        "Mutton Shanks (Niharri)": "£14.99",
+        "Mutton Shoulder": "£14.99",
+        "Premium Mutton Leg Mince (No Fat)": "£15.99",
+        "Whole Baby Lamb (20kg Net Differs)": "£299.99",
+        "Whole Frozen Milk Fed Suckling Lamb Leg": "£19.99",
+        "Whole Frozen Milk Fed Suckling Lamb Shoulder": "£19.99 (Out of stock)",
+        "Whole Kid Goat (4Kg-5Kg)": "£95.00",
+        "Whole Lamb Leg for Roasting 2.5-2.8 Kg": "£54.95",
+        "Whole Sheep (30Kg)": "£299.99"
     },
+
     "BEEF": {
         "200g Gold Leaf Sirloin": "£12.99",
+        "5 Tariq Halal Beef Sirloin Steak (200 gms each)": "£34.99",
         "Beef Knuckle Steak (3 Steaks)": "£9.99",
         "Beef Marrow Bones 250-300g": "£3.99",
-        ...
+        "Beef Mince": "£12.99",
+        "Beef Oxtail": "£14.99",
+        "Beef Shin On Bone": "£11.99",
+        "Beef Short Rib": "£13.99",
+        "Beef Topside Steak": "£4.49",
+        "Bone In Rib-Eye Steak (Each) 350-400g": "£9.99",
+        "Boneless Rib-Eye Steak (3 Steaks)": "£22.99",
+        "Buffalo On the Bone Mixed (1kg)": "£11.99 (Out of stock)",
+        "Chilean Wagyu Fillet Steak BMS 6-7 (2 x 150g)": "£79.99",
+        "Cow Foot (Whole)": "£5.99",
+        "Diced Boneless Beef": "£16.99",
+        "Fillet Steak (3 Steaks) 600g (3 x 200g)": "£32.99",
+        "French Trimmed Veal Chop 300-350g": "£9.99",
+        "Premium Beef Mince (Ideal For Burgers)": "£15.99",
+        "Sirloin Steak (whole) Roasting Joint 1kg": "£34.99",
+        "Veal Brain (Whole)": "£5.99 (Out of stock)",
+        "Veal Liver": "£9.99 (Out of stock)",
+        "Veal Mince": "£11.99",
+        "Veal Ossobucu (Shin)": "£14.99 (Out of stock)",
+        "Veal Ribeye Steak (3 Steaks)": "£15.99",
+        "Veal Striploin Steak (3 Steaks)": "£13.99",
+        "Veal Tail": "£12.99",
+        "Veal T-Bone (Each) 390-410g": "£8.99 (Out of stock)",
+        "Veal Topside Steak (3 Steaks) 600g (3 x 200g)": "£15.99",
+        "Wagyu Striploin Steak (300g) BMS 8-9": "£69.99",
+        "Wagyu Tomahawk Steak (BMS 6-7) 1.3-1.5kg": "£99.99 (Out of stock)",
+        "Whole Fillet Steak Roasting Joint 2.5kg (approx)": "£139.99"
     },
+
     "GROCERIES": {
         "Chapatti (10 Pieces)": "£3.49",
         "Coffee (200g)": "£3.99",
         "Cooking Oil (1L)": "£2.99",
-        ...
+        "Flour (2Kg)": "£1.99",
+        "Honey (500g)": "£4.99",
+        "Naan Bread (4 Pieces)": "£2.99",
+        "Oats (500g)": "£1.99",
+        "Rice (Basmati, 10Kg)": "£14.99",
+        "Salt (1Kg)": "£0.49",
+        "Spices (Various)": "£3.99",
+        "Sugar (1Kg)": "£0.99",
+        "Tea (100 Bags)": "£2.49",
+        "Tinned Tomatoes (400g)": "£0.69"
     },
+
     "EXOTIC MEATS": {
         "Alligator Meat (500g)": "£14.99",
         "Camel Burgers (4 pieces)": "£12.99",
-        ...
+        "Kangaroo Meat (250g)": "£6.99",
+        "Venison Steaks (250g)": "£8.99",
+        "Wild Boar Sausages": "£4.99"
     },
+
     "FROZEN MEATS": {
         "Frozen Beef Mince (500g)": "£4.99",
         "Frozen Chicken Drumsticks (Skin On)": "£5.99",
-        ...
+        "Frozen Chicken Wings (1kg)": "£6.99",
+        "Frozen Lamb Shoulder (1kg)": "£8.99"
     },
+
     "COMBOS": {
         "Greek Chicken & Lamb Gyros (kebab) 1kg": "£12.99"
     }
 }
-
