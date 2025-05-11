@@ -46,30 +46,43 @@ def find_products(search_term):
 
     return results
 
-# ========== AI RESPONSE FUNCTION ==========
 def generate_ai_response(user_query):
-    # Use STORE_INFO directly (it's already a string)
-    store_info_text = STORE_INFO
+    # --- Format store info ---
+    store_info_text = STORE_INFO.strip()
 
-    # Format PRODUCT_CATALOG properly
-    product_lines = []
-    for category, products in PRODUCT_CATALOG.items():
-        product_lines.append(f"\n{category.upper()}:")
-        for product in products:
-            product_lines.append(f"- {product['name']}: {product['price']}")
-    product_catalog_text = "\n".join(product_lines)
+    # --- Format product catalog by category ---
+    product_sections = []
+    for category, items in PRODUCT_CATALOG.items():
+        if isinstance(items, dict):  # For cleaned dict version
+            section_lines = [f"\n{category.upper()} PRODUCTS:"]
+            for product, price in items.items():
+                section_lines.append(f"- {product}: {price}")
+        else:  # In case it's in list-of-dicts format
+            section_lines = [f"\n{category.upper()} PRODUCTS:"]
+            for product in items:
+                section_lines.append(f"- {product['name']}: {product['price']}")
+        product_sections.append("\n".join(section_lines))
 
-    # Final system prompt
+    product_catalog_text = "\n".join(product_sections)
+
+    # --- Define system prompt with clear separation ---
     system_message = (
-        "You are a helpful WhatsApp assistant for Tariq Halal Meats UK. "
-        "Answer customer questions clearly and concisely. Use the information below:\n\n"
-        "STORE INFO:\n"
+        "You are a smart and helpful WhatsApp assistant for Tariq Halal Meats UK.\n"
+        "Your job is to answer customer questions clearly and accurately using the information provided.\n\n"
+        "If the question is about:\n"
+        "- 🏪 Store hours, delivery info, or general services: Use STORE INFO.\n"
+        "- 🥩 Specific products, meat types, or prices: Use PRODUCT CATALOG.\n"
+        "- ❓ Anything else: Give a helpful and polite general response.\n\n"
+        "Respond with only the relevant information needed for the question.\n"
+        "Use categories like POULTRY, BEEF, LAMB, GROCERIES to stay organized.\n"
+        "Always be friendly and concise.\n\n"
+        "========== STORE INFO ==========\n"
         f"{store_info_text}\n\n"
-        "PRODUCT CATALOG:\n"
-        f"{product_catalog_text}\n\n"
-        "Always be friendly and helpful. If a question is about delivery, prices, store hours, or specific product names, use the info provided above."
+        "========== PRODUCT CATALOG ==========\n"
+        f"{product_catalog_text}"
     )
 
+    # --- Chat API call ---
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -77,10 +90,11 @@ def generate_ai_response(user_query):
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_query}
             ],
-            max_tokens=300,
+            max_tokens=500,
             temperature=0.3
         )
         return response.choices[0].message["content"].strip()
+
     except Exception as e:
         logger.error(f"AI Error: {str(e)}")
         return "Sorry, I encountered an issue while processing your request. Please try again later."
