@@ -90,6 +90,21 @@ def generate_ai_response(user_query):
         logger.exception("AI Response Error")
         return "Sorry, I had trouble understanding that. Please try again in a moment."
 
+def find_products(query):
+    query = query.strip().lower()
+    results = []
+
+    for category, items in PRODUCT_CATALOG.items():
+        for product_name, price in items.items():
+            if query in product_name.lower() or query in category.lower():
+                results.append(f"- {product_name} ({category}): {price}")
+
+    if results:
+        return "\n".join(results)
+    else:
+        return "Sorry, I couldn’t find any matching products. Try a different name like 'beef' or 'lamb'."
+
+
 
 # ========== WHATSAPP ROUTE ==========
 
