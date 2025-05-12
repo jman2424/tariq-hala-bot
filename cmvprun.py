@@ -30,59 +30,66 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
-# ========== PRODUCT SEARCH FUNCTION ==========
+# ========== HELPER: FORMAT PRODUCT CATALOG ==========
 
-def find_products(message):
-    message = message.lower()
-    results = []
+def format_product_catalog(catalog):
+    lines = []
+    for category, products in catalog.items():
+        lines.append(f"\n🛒 {category.upper()}")
+        for product in products:
+            # Make sure 'name' and 'price' exist
+            name = product.get("name", "Unnamed Product")
+            price = product.get("price", "Price Not Available")
+            lines.append(f"• {name}: {price}")
+    return "\n".join(lines)
 
-    for category_name, category in PRODUCT_CATALOG.items():
-        for product_name, price in category.items():
-            if message in product_name.lower() or message in category_name.lower():
-                results.append(f"{product_name} - {price}")
-    
-    return results
 
+def format_store_info(info):
+    if not isinstance(info, dict):
+        return "Store information is not available."
+
+    lines = []
+    for key, value in info.items():
+        label = key.replace("_", " ").title()
+        lines.append(f"{label}: {value}")
+    return "\n".join(lines)
 
 # ========== AI RESPONSE FUNCTION ==========
 
 def generate_ai_response(user_query):
-    # Use STORE_INFO directly (it's already a string)
-    store_info_text = STORE_INFO
-
-    # Format PRODUCT_CATALOG properly
-    product_lines = []
-    for category, products in PRODUCT_CATALOG.items():
-        product_lines.append(f"\n{category.upper()}:")
-        for product in products:
-            product_lines.append(f"- {product['name']}: {product['price']}")
-    product_catalog_text = "\n".join(product_lines)
-
-    # Final system prompt
-    system_message = (
-        "You are a helpful WhatsApp assistant for Tariq Halal Meats UK. "
-        "Answer customer questions clearly and concisely. Use the information below:\n\n"
-        "STORE INFO:\n"
-        f"{store_info_text}\n\n"
-        "PRODUCT CATALOG:\n"
-        f"{product_catalog_text}\n\n"
-        "Always be friendly and helpful. If a question is about delivery, prices, store hours, or specific product names, use the info provided above."
-    )
-
     try:
+        # Build system message safely
+        store_info_text = STORE_INFO.strip() if isinstance(STORE_INFO, str) else "No store info available."
+        product_catalog_text = format_product_catalog(PRODUCT_CATALOG)
+
+        system_message = (
+            "You are a helpful and friendly WhatsApp assistant for Tariq Halal Meats UK. "
+            "Answer customer questions clearly and professionally using only the information below.\n\n"
+            "🏬 STORE INFO:\n"
+            f"{store_info_text}\n\n"
+            "📦 PRODUCT CATALOG:\n"
+            f"{product_catalog_text}\n\n"
+            "If the question is about delivery, products, pricing, opening hours, or any other store-related details, "
+            "respond using this info. If you're unsure, kindly let the customer know."
+        )
+
+        # Call OpenAI API
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_query}
             ],
-            max_tokens=300,
+            max_tokens=500,
             temperature=0.3
         )
+
         return response.choices[0].message["content"].strip()
+
     except Exception as e:
-        logger.error(f"AI Error: {str(e)}")
-        return "Sorry, I encountered an issue while processing your request. Please try again later."
+        logger.exception("AI Response Error")
+        return "Sorry, I had trouble understanding that. Please try again in a moment."
+
 
 # ========== WHATSAPP ROUTE ==========
 
