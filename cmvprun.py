@@ -32,22 +32,17 @@ openai.api_key = OPENAI_API_KEY
 
 # ========== PRODUCT SEARCH FUNCTION ==========
 
-@lru_cache(maxsize=128)
-def find_products(search_term):
-    search_term = search_term.lower().strip()
-    results = {}
+def find_products(message):
+    message = message.lower()
+    results = []
 
-    for category, products in PRODUCT_CATALOG.items():
-        matched_products = []
-        for product in products:
-            name = product["name"]
-            price = product["price"]
-            if search_term in name.lower():
-                matched_products.append((name, price))
-        if matched_products:
-            results[category] = matched_products
-
+    for category_name, category in PRODUCT_CATALOG.items():
+        for product_name, price in category.items():
+            if message in product_name.lower() or message in category_name.lower():
+                results.append(f"{product_name} - {price}")
+    
     return results
+
 
 # ========== AI RESPONSE FUNCTION ==========
 
