@@ -55,10 +55,13 @@ def format_store_info(info):
 
 # ========== FUZZY SEARCH ==========
 
-def find_products(query):
-    """Searches for products based on the query and returns results."""
-    query = query.lower().strip()
-    results = []
+def find_products(message):
+    for product in PRODUCT_CATALOG:
+        if isinstance(product, dict):  # Ensure it's a dictionary before accessing
+            name = product.get("name", "Unknown Product")
+            # continue with the code
+        else:
+            print(f"Invalid product data: {product}")  # Debugging line
 
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
