@@ -56,12 +56,36 @@ def format_store_info(info):
 # ========== FUZZY SEARCH ==========
 
 def find_products(message):
-    for product in PRODUCT_CATALOG:
-        if isinstance(product, dict):  # Ensure it's a dictionary before accessing
-            name = product.get("name", "Unknown Product")
-            # continue with the code
-        else:
-            print(f"Invalid product data: {product}")  # Debugging line
+    # If the message is about finding a product
+    if "product" in message.lower() or "buy" in message.lower():
+        for product in PRODUCT_CATALOG:
+            if isinstance(product, dict):  # Ensure it's a dictionary before accessing
+                name = product.get("name", "Unknown Product")
+                # You can refine the search, or add more details like price
+                if name.lower() in message.lower():
+                    return f"Sure! Here's {name}. If you'd like more details or to add it to your cart, let me know!"
+        return "I couldn't find that product. Could you please check the name again?"
+
+    # If the message is asking about the store
+    elif "store hours" in message.lower() or "open" in message.lower():
+        return "Our store is open from 9 AM to 9 PM, 7 days a week. Feel free to visit anytime!"
+
+    # If the message is asking about delivery
+    elif "delivery" in message.lower() or "shipping" in message.lower():
+        return "We offer fast and reliable delivery. You can check our delivery policies on our website, or I can send you the details right here."
+
+    # If the message is about general inquiries (e.g., about the store's history, contact info, etc.)
+    elif "history" in message.lower() or "contact" in message.lower():
+        return "Tariq Halal Meatshop has been serving the community with high-quality halal meat since 1990. You can contact us at +44 123 456 789 or visit us in-store!"
+
+    # If the message is unrelated to products (e.g., greetings)
+    elif "hello" in message.lower() or "hi" in message.lower():
+        return "Hello! How can I assist you today? 😊"
+
+    # If the message is not recognized, show general help
+    else:
+        return "I'm here to help! You can ask about our products, store hours, delivery policies, or anything else!"
+
 
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
