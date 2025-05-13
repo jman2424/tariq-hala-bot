@@ -1,36 +1,33 @@
 import os
 import traceback
 import logging
-from functools import lru_cache
 from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 import openai
 from dotenv import load_dotenv
+from difflib import get_close_matches
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# ✅ Import store info and product catalog
+# ✅ Imports
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
 # ========== CONFIGURATION ==========
-
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ========== EXTERNAL KEYS ==========
-
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
-# ========== HELPER: FORMAT PRODUCT CATALOG ==========
+# ========== FORMATTERS ==========
 
 def format_product_catalog(catalog):
     lines = []
@@ -45,29 +42,47 @@ def format_product_catalog(catalog):
 def format_store_info(info):
     if not isinstance(info, dict):
         return "Store information is not available."
-
-    lines = []
-    for key, value in info.items():
-        label = key.replace("_", " ").title()
-        lines.append(f"{label}: {value}")
+    lines = [f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()]
     return "\n".join(lines)
 
-# ========== AI RESPONSE FUNCTION ==========
+# ========== FUZZY SEARCH ==========
+
+def find_products(query):
+    query = query.lower().strip()
+    results = []
+
+    for category, products in PRODUCT_CATALOG.items():
+        for product in products:
+            name = product["name"]
+            price = product["price"]
+            all_words = f"{name} {category}".lower()
+
+            if query in all_words:
+                results.append(f"- {name} ({category}): {price}")
+            else:
+                close = get_close_matches(query, [name.lower(), category.lower()], n=1, cutoff=0.6)
+                if close:
+                    results.append(f"- {name} ({category}): {price}")
+
+    if results:
+        return "\n".join(results)
+    else:
+        return "Sorry, I couldn’t find any matching products. Try a different name like 'beef' or 'minced chicken'."
+
+# ========== AI ASSISTANT ==========
 
 def generate_ai_response(user_query):
     try:
-        store_info_text = STORE_INFO.strip() if isinstance(STORE_INFO, str) else "No store info available."
         product_catalog_text = format_product_catalog(PRODUCT_CATALOG)
+        store_info_text = format_store_info(STORE_INFO)
 
         system_message = (
             "You are a helpful and friendly WhatsApp assistant for Tariq Halal Meats UK. "
-            "Answer customer questions clearly and professionally using only the information below.\n\n"
-            "🏬 STORE INFO:\n"
-            f"{store_info_text}\n\n"
-            "📦 PRODUCT CATALOG:\n"
-            f"{product_catalog_text}\n\n"
-            "If the question is about delivery, products, pricing, opening hours, or any other store-related details, "
-            "respond using this info. If you're unsure, kindly let the customer know."
+            "Use the info below to answer customer questions clearly, kindly, and professionally.\n\n"
+            f"🏬 STORE INFO:\n{store_info_text}\n\n"
+            f"📦 PRODUCT CATALOG:\n{product_catalog_text}\n\n"
+            "Answer questions about delivery, pricing, hours, or anything else using only this info. "
+            "If you’re not sure, politely say you're unsure."
         )
 
         response = openai.ChatCompletion.create(
@@ -76,31 +91,14 @@ def generate_ai_response(user_query):
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_query}
             ],
-            max_tokens=500,
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=500
         )
 
         return response.choices[0].message["content"].strip()
-
-    except Exception as e:
-        logger.exception("AI Response Error")
-        return "Sorry, I had trouble understanding that. Please try again in a moment."
-
-# ========== PRODUCT SEARCH ==========
-
-def find_products(query):
-    query = query.strip().lower()
-    results = []
-
-    for category, items in PRODUCT_CATALOG.items():
-        for product_name, price in items.items():
-            if query in product_name.lower() or query in category.lower():
-                results.append(f"- {product_name} ({category}): {price}")
-
-    if results:
-        return "\n".join(results)
-    else:
-        return "Sorry, I couldn’t find any matching products. Try a different name like 'beef' or 'lamb'."
+    except Exception:
+        logger.exception("AI response failed")
+        return "Sorry, I had trouble answering that. Please try again shortly."
 
 # ========== WHATSAPP ROUTE ==========
 
@@ -113,67 +111,57 @@ def handle_whatsapp_message():
             request.form,
             request.headers.get('X-Twilio-Signature', '')
         ):
-            logger.warning("Invalid Twilio signature")
             return "Unauthorized", 403
 
         message = request.values.get('Body', '').strip()
         if not message:
             return "Empty message", 400
 
-        logger.info(f"Received message: {message}")
+        logger.info(f"Incoming message: {message}")
 
         product_results = find_products(message)
 
-        if "Sorry, I couldn’t find any matching products" not in product_results:
-            reply = f"We found these matching products:\n{product_results}\n\nNeed anything else?"
+        if "Sorry" not in product_results:
+            reply = f"🔍 Here’s what we found:\n{product_results}\n\nNeed anything else?"
         else:
             ai_response = generate_ai_response(message)
-            reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
+            reply = ai_response
 
-        logger.info(f"Sending response: {reply[:100]}...")
+        logger.info(f"Bot reply: {reply[:100]}...")
 
         twiml = MessagingResponse()
         twiml.message(reply)
         return Response(str(twiml), mimetype="application/xml")
 
     except Exception as e:
-        logger.error(f"Error processing message: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         traceback.print_exc()
         return "Server Error", 500
 
-# ========== STATUS ROUTE ==========
-
+# ========== STATUS UPDATE (OPTIONAL) ==========
 @app.route("/whatsapp/status", methods=["POST"])
 def handle_status_update():
-    status = request.values.get('MessageStatus', '')
-    message_sid = request.values.get('MessageSid', '')
-    logger.info(f"Message status update - SID: {message_sid}, Status: {status}")
+    logger.info(f"Status update: SID={request.values.get('MessageSid', '')}, Status={request.values.get('MessageStatus', '')}")
     return "OK", 200
 
 # ========== HEALTH CHECK ==========
-
 @app.route("/health")
 def health_check():
     return jsonify({
-        "status": "operational",
-        "services": {
-            "openai": bool(OPENAI_API_KEY),
-            "twilio": bool(TWILIO_AUTH_TOKEN)
-        }
+        "status": "✅ Online",
+        "openai": bool(OPENAI_API_KEY),
+        "twilio": bool(TWILIO_AUTH_TOKEN)
     })
 
 # ========== HOME ==========
-
 @app.route("/")
 def home():
-    return "🟢 Tariq Halal Meats WhatsApp Bot is Online"
+    return "🟢 Tariq Halal Meat Shop WhatsApp Bot is running!"
 
-# ========== RUN SERVER LOCALLY ==========
-
+# ========== MAIN ==========
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
     app.run(
         host="0.0.0.0",
-        port=port,
+        port=int(os.environ.get("PORT", 10000)),
         debug=os.getenv("DEBUG", "false").lower() == "true"
     )
