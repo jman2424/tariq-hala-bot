@@ -37,12 +37,10 @@ def format_product_catalog(catalog):
     for category, products in catalog.items():
         lines.append(f"\n🛒 {category.upper()}")
         for product in products:
-            # Make sure 'name' and 'price' exist
             name = product.get("name", "Unnamed Product")
             price = product.get("price", "Price Not Available")
             lines.append(f"• {name}: {price}")
     return "\n".join(lines)
-
 
 def format_store_info(info):
     if not isinstance(info, dict):
@@ -58,7 +56,6 @@ def format_store_info(info):
 
 def generate_ai_response(user_query):
     try:
-        # Build system message safely
         store_info_text = STORE_INFO.strip() if isinstance(STORE_INFO, str) else "No store info available."
         product_catalog_text = format_product_catalog(PRODUCT_CATALOG)
 
@@ -73,7 +70,6 @@ def generate_ai_response(user_query):
             "respond using this info. If you're unsure, kindly let the customer know."
         )
 
-        # Call OpenAI API
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -90,6 +86,8 @@ def generate_ai_response(user_query):
         logger.exception("AI Response Error")
         return "Sorry, I had trouble understanding that. Please try again in a moment."
 
+# ========== PRODUCT SEARCH ==========
+
 def find_products(query):
     query = query.strip().lower()
     results = []
@@ -103,8 +101,6 @@ def find_products(query):
         return "\n".join(results)
     else:
         return "Sorry, I couldn’t find any matching products. Try a different name like 'beef' or 'lamb'."
-
-
 
 # ========== WHATSAPP ROUTE ==========
 
@@ -126,16 +122,13 @@ def handle_whatsapp_message():
 
         logger.info(f"Received message: {message}")
 
-       product_results = find_products(message)
+        product_results = find_products(message)
 
-# If product_results contains a match, use it
-if "Sorry, I couldn’t find any matching products" not in product_results:
-    reply = f"We found these matching products:\n{product_results}\n\nNeed anything else?"
-else:
-    # No matches, use AI
-    ai_response = generate_ai_response(message)
-    reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
-
+        if "Sorry, I couldn’t find any matching products" not in product_results:
+            reply = f"We found these matching products:\n{product_results}\n\nNeed anything else?"
+        else:
+            ai_response = generate_ai_response(message)
+            reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
 
         logger.info(f"Sending response: {reply[:100]}...")
 
