@@ -126,19 +126,16 @@ def handle_whatsapp_message():
 
         logger.info(f"Received message: {message}")
 
-        # Check if message contains a product search term
-        product_results = find_products(message)
-        if product_results:
-            response_lines = ["We found these matching products:"]
-            for category, items in product_results.items():
-                response_lines.append(f"\n*{category}*")
-                response_lines.extend(f"- {name}: {price}" for name, price in items)
-            response_lines.append("\nNeed anything else?")
-            reply = "\n".join(response_lines)
-        else:
-            # If no products found, use AI to generate a response
-            ai_response = generate_ai_response(message)
-            reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
+       product_results = find_products(message)
+
+# If product_results contains a match, use it
+if "Sorry, I couldn’t find any matching products" not in product_results:
+    reply = f"We found these matching products:\n{product_results}\n\nNeed anything else?"
+else:
+    # No matches, use AI
+    ai_response = generate_ai_response(message)
+    reply = ai_response or "Sorry, I couldn't find anything useful. Please ask a different question."
+
 
         logger.info(f"Sending response: {reply[:100]}...")
 
