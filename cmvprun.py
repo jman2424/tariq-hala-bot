@@ -9,7 +9,7 @@ import openai
 from dotenv import load_dotenv
 from difflib import get_close_matches
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
 # ✅ Imports
@@ -17,12 +17,18 @@ from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
 # ========== CONFIGURATION ==========
+
 app = Flask(__name__)
+
+# Cache configuration (optional for better performance)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
+
+# Logger configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ========== EXTERNAL KEYS ==========
+
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
@@ -30,6 +36,7 @@ openai.api_key = OPENAI_API_KEY
 # ========== FORMATTERS ==========
 
 def format_product_catalog(catalog):
+    """Formats the product catalog into a user-friendly string."""
     lines = []
     for category, products in catalog.items():
         lines.append(f"\n🛒 {category.upper()}")
@@ -40,6 +47,7 @@ def format_product_catalog(catalog):
     return "\n".join(lines)
 
 def format_store_info(info):
+    """Formats the store information into a readable string."""
     if not isinstance(info, dict):
         return "Store information is not available."
     lines = [f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()]
@@ -48,6 +56,7 @@ def format_store_info(info):
 # ========== FUZZY SEARCH ==========
 
 def find_products(query):
+    """Searches for products based on the query and returns results."""
     query = query.lower().strip()
     results = []
 
@@ -72,6 +81,7 @@ def find_products(query):
 # ========== AI ASSISTANT ==========
 
 def generate_ai_response(user_query):
+    """Generates a response using OpenAI's GPT model."""
     try:
         product_catalog_text = format_product_catalog(PRODUCT_CATALOG)
         store_info_text = format_store_info(STORE_INFO)
@@ -87,16 +97,14 @@ def generate_ai_response(user_query):
 
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_query}
-            ],
+            messages=[{"role": "system", "content": system_message},
+                      {"role": "user", "content": user_query}],
             temperature=0.3,
             max_tokens=500
         )
 
         return response.choices[0].message["content"].strip()
-    except Exception:
+    except Exception as e:
         logger.exception("AI response failed")
         return "Sorry, I had trouble answering that. Please try again shortly."
 
@@ -104,23 +112,29 @@ def generate_ai_response(user_query):
 
 @app.route("/whatsapp", methods=["POST"])
 def handle_whatsapp_message():
+    """Handles incoming WhatsApp messages and responds accordingly."""
     try:
+        # Twilio validation
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
         if not validator.validate(
             request.url,
             request.form,
             request.headers.get('X-Twilio-Signature', '')
         ):
+            logger.warning("Unauthorized request!")
             return "Unauthorized", 403
 
+        # Retrieve the incoming message
         message = request.values.get('Body', '').strip()
         if not message:
             return "Empty message", 400
 
         logger.info(f"Incoming message: {message}")
 
+        # Search for matching products
         product_results = find_products(message)
 
+        # If no products found, fall back to AI assistant
         if "Sorry" not in product_results:
             reply = f"🔍 Here’s what we found:\n{product_results}\n\nNeed anything else?"
         else:
@@ -129,6 +143,7 @@ def handle_whatsapp_message():
 
         logger.info(f"Bot reply: {reply[:100]}...")
 
+        # Send the response via Twilio
         twiml = MessagingResponse()
         twiml.message(reply)
         return Response(str(twiml), mimetype="application/xml")
@@ -139,14 +154,18 @@ def handle_whatsapp_message():
         return "Server Error", 500
 
 # ========== STATUS UPDATE (OPTIONAL) ==========
+
 @app.route("/whatsapp/status", methods=["POST"])
 def handle_status_update():
+    """Logs status updates from Twilio."""
     logger.info(f"Status update: SID={request.values.get('MessageSid', '')}, Status={request.values.get('MessageStatus', '')}")
     return "OK", 200
 
 # ========== HEALTH CHECK ==========
+
 @app.route("/health")
 def health_check():
+    """Checks the health of the service."""
     return jsonify({
         "status": "✅ Online",
         "openai": bool(OPENAI_API_KEY),
@@ -154,12 +173,16 @@ def health_check():
     })
 
 # ========== HOME ==========
+
 @app.route("/")
 def home():
+    """Basic homepage route."""
     return "🟢 Tariq Halal Meat Shop WhatsApp Bot is running!"
 
 # ========== MAIN ==========
+
 if __name__ == "__main__":
+    # Run the Flask app
     app.run(
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 10000)),
