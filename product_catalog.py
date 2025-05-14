@@ -37,7 +37,7 @@ PRODUCT_CATALOG = {
         "Superchick American Style Fillet Burger": "£11.99",
         "Tandoori Chicken 1100-1200 Gms": "£6.99",
         "Tariq Halal Traditional Beef Sausages (with hint of pepper) 342g": "£3.99",
-        "Veal Burger": "£2.99"
+        "Veal Burger": "£2.99",
     },
 
     "LAMB": {
@@ -87,7 +87,7 @@ PRODUCT_CATALOG = {
         "Whole Frozen Milk Fed Suckling Lamb Shoulder": "£19.99 (Out of stock)",
         "Whole Kid Goat (4Kg-5Kg)": "£95.00",
         "Whole Lamb Leg for Roasting 2.5-2.8 Kg": "£54.95",
-        "Whole Sheep (30Kg)": "£299.99"
+        "Whole Sheep (30Kg)": "£299.99",
     },
 
     "BEEF": {
@@ -121,7 +121,7 @@ PRODUCT_CATALOG = {
         "Veal Topside Steak (3 Steaks) 600g (3 x 200g)": "£15.99",
         "Wagyu Striploin Steak (300g) BMS 8-9": "£69.99",
         "Wagyu Tomahawk Steak (BMS 6-7) 1.3-1.5kg": "£99.99 (Out of stock)",
-        "Whole Fillet Steak Roasting Joint 2.5kg (approx)": "£139.99"
+        "Whole Fillet Steak Roasting Joint 2.5kg (approx)": "£139.99",
     },
 
     "GROCERIES": {
@@ -137,7 +137,7 @@ PRODUCT_CATALOG = {
         "Spices (Various)": "£3.99",
         "Sugar (1Kg)": "£0.99",
         "Tea (100 Bags)": "£2.49",
-        "Tinned Tomatoes (400g)": "£0.69"
+        "Tinned Tomatoes (400g)": "£0.69",
     },
 
     "EXOTIC MEATS": {
@@ -145,17 +145,17 @@ PRODUCT_CATALOG = {
         "Camel Burgers (4 pieces)": "£12.99",
         "Kangaroo Meat (250g)": "£6.99",
         "Venison Steaks (250g)": "£8.99",
-        "Wild Boar Sausages": "£4.99"
+        "Wild Boar Sausages": "£4.99",
     },
 
     "FROZEN MEATS": {
         "Frozen Beef Mince (500g)": "£4.99",
         "Frozen Chicken Drumsticks (Skin On)": "£5.99",
         "Frozen Chicken Wings (1kg)": "£6.99",
-        "Frozen Lamb Shoulder (1kg)": "£8.99"
+        "Frozen Lamb Shoulder (1kg)": "£8.99",
     },
 
     "COMBOS": {
-        "Greek Chicken & Lamb Gyros (kebab) 1kg": "£12.99"
-    }
+        "Greek Chicken & Lamb Gyros (kebab) 1kg": "£12.99",
+    },
 }
