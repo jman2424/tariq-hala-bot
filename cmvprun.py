@@ -58,12 +58,12 @@ def fuzzy_product_search(query):
         for product in products:
             name = product.get("name", "").lower()
             if query_lower in name or query_lower in category.lower():
-                results.append(f"- {product['name']} ({category}): {product['price']}")
+                results.append(f"- {product['name']} ({category.title()}): {product['price']}")
             else:
                 # Use fuzzy matching for approximate matches
                 close = get_close_matches(query_lower, [name, category.lower()], n=1, cutoff=0.6)
                 if close:
-                    results.append(f"- {product['name']} ({category}): {product['price']}")
+                    results.append(f"- {product['name']} ({category.title()}): {product['price']}")
 
     if results:
         return "\n".join(results)
@@ -71,31 +71,46 @@ def fuzzy_product_search(query):
         return None  # No matches found
 
 def find_products(message):
-    """Determine if message relates to products or store info and respond accordingly."""
-    msg = message.lower()
-
-    # Check for keywords and provide canned answers or product search
-    if any(keyword in msg for keyword in ["product", "buy", "price"]):
-        search_result = fuzzy_product_search(message)
-        if search_result:
-            return f"🔍 Here are some products I found:\n{search_result}"
-        else:
-            return "Sorry, I couldn’t find any matching products. Try a different name like 'beef' or 'minced chicken'."
-
-    elif "store hours" in msg or "open" in msg:
+    """Improved product finder with fuzzy word matching and keyword replies."""
+    message_lower = message.lower()
+    
+    # Simple keyword replies
+    if any(x in message_lower for x in ["store hours", "open", "close"]):
         return "Our store is open from 9 AM to 9 PM, 7 days a week. Feel free to visit anytime!"
-
-    elif "delivery" in msg or "shipping" in msg:
+    if any(x in message_lower for x in ["delivery", "shipping"]):
         return "We offer fast and reliable delivery. You can check our delivery policies on our website, or I can send you the details right here."
-
-    elif "history" in msg or "contact" in msg:
+    if any(x in message_lower for x in ["history", "contact"]):
         return "Tariq Halal Meatshop has been serving the community with high-quality halal meat since 1990. You can contact us at +44 123 456 789 or visit us in-store!"
-
-    elif "hello" in msg or "hi" in msg:
+    if any(x in message_lower for x in ["hello", "hi", "hey"]):
         return "Hello! How can I assist you today? 😊"
-
-    else:
-        return None  # No direct canned response found
+    
+    # Search products with fuzzy matching by words
+    all_product_names = []
+    product_map = {}
+    
+    for category, products in PRODUCT_CATALOG.items():
+        for product in products:
+            name = product.get("name", "").lower()
+            all_product_names.append(name)
+            product_map[name] = (product, category)
+    
+    # Find close matches to message words
+    words = message_lower.split()
+    matched_products = set()
+    for word in words:
+        matches = get_close_matches(word, all_product_names, n=3, cutoff=0.6)
+        for m in matches:
+            matched_products.add(m)
+    
+    if matched_products:
+        results = []
+        for name in matched_products:
+            product, category = product_map[name]
+            results.append(f"- {product['name']} ({category.title()}): {product['price']}")
+        return "Here are some products I found:\n" + "\n".join(results)
+    
+    # If no match found
+    return "Sorry, I couldn’t find any matching products. Could you try a different name or be more specific?"
 
 def generate_ai_response(user_query):
     """Generate response from OpenAI GPT-3.5 Turbo using store info and product catalog."""
