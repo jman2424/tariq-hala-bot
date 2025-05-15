@@ -103,7 +103,7 @@ def handle_order_flow(message, user_id):
             try:
                 total += float(price.replace("£", ""))
             except Exception as e:
-            logger.warning(f"Could not parse price for {name}: {e}")
+                logger.warning(f"Could not parse price for {name}: {e}")
         lines.append(f"Total: £{total:.2f}")
         return "\n".join(lines)
 
