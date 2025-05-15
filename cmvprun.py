@@ -99,8 +99,7 @@ def handle_order_flow(message, user_id):
             except:
                 pass
         lines.append(f"Total: £{total:.2f}")
-        return "
-".join(lines)
+       return "\n".join(lines)
 
     elif "checkout" in lowered:
         if not cart:
