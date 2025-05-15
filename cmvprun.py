@@ -46,10 +46,9 @@ def fuzzy_product_search(query):
     results = []
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
-            if isinstance(product, dict):
-                name = product['name'].lower()
-                
-                    
+            if not isinstance(product, dict):
+                continue
+            name = product.get('name', '').lower()
             if query in name or query in category.lower():
                 results.append((product['name'], product['price'], category.title()))
             else:
@@ -76,7 +75,11 @@ def handle_order_flow(message, user_id):
     cart_key = f"cart_{user_id}"
     user_key = f"user_{user_id}"
     cart = cache.get(cart_key) or []
+    if not isinstance(cart, list):
+        cart = []
     user_data = cache.get(user_key) or {}
+    if not isinstance(user_data, dict):
+        user_data = {}
     lowered = message.lower()
 
     if lowered.startswith("add "):
@@ -99,8 +102,8 @@ def handle_order_flow(message, user_id):
             lines.append(f"• {name}: {price}")
             try:
                 total += float(price.replace("£", ""))
-            except:
-                pass
+            except Exception as e:
+            logger.warning(f"Could not parse price for {name}: {e}")
         lines.append(f"Total: £{total:.2f}")
         return "\n".join(lines)
 
