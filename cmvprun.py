@@ -46,7 +46,8 @@ def fuzzy_product_search(query):
     results = []
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
-            name = product['name'].lower()
+            if isinstance(product, dict):
+                name = product['name'].lower()
             if query in name or query in category.lower():
                 results.append((product['name'], product['price'], category.title()))
             else:
