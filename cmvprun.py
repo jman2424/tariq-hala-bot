@@ -1,7 +1,7 @@
 import os
 import traceback
 import logging
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, session
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
@@ -12,204 +12,228 @@ from difflib import get_close_matches
 # Load environment variables from .env file
 load_dotenv()
 
-# Imports of your store info and product catalog
+# Import store data
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# ===== CONFIGURATION =====
-
+# ========== CONFIG ==========
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Environment keys
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
-# ===== HELPERS =====
+# ========== UTILITIES ==========
 
 def format_product_catalog(catalog):
-    """Convert product catalog dict into a readable string."""
     lines = []
     for category, products in catalog.items():
         lines.append(f"\n🛒 {category.upper()}:")
         for product in products:
-            name = product.get("name", "Unnamed Product")
-            price = product.get("price", "Price Not Available")
-            lines.append(f"• {name}: {price}")
+            lines.append(f"• {product['name']}: {product['price']}")
     return "\n".join(lines)
 
 def format_store_info(info):
-    """Convert store info dict into a readable string."""
-    if not isinstance(info, dict):
-        return "Store information is not available."
     return "\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
 
 def fuzzy_product_search(query):
-    """Search products with fuzzy matching and return matches."""
+    query = query.lower()
     results = []
-    query_lower = query.lower()
-
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
-            name = product.get("name", "").lower()
-            if query_lower in name or query_lower in category.lower():
-                results.append(f"- {product['name']} ({category.title()}): {product['price']}")
+            name = product['name'].lower()
+            if query in name or query in category.lower():
+                results.append((product['name'], product['price'], category.title()))
             else:
-                # Use fuzzy matching for approximate matches
-                close = get_close_matches(query_lower, [name, category.lower()], n=1, cutoff=0.6)
-                if close:
-                    results.append(f"- {product['name']} ({category.title()}): {product['price']}")
+                match = get_close_matches(query, [name], n=1, cutoff=0.65)
+                if match:
+                    results.append((product['name'], product['price'], category.title()))
+    return results if results else None
 
-    if results:
-        return "\n".join(results)
-    else:
-        return None  # No matches found
+def answer_faqs(message):
+    message = message.lower()
+    if any(kw in message for kw in ["hours", "opening", "closing"]):
+        return f"Our store is open from {STORE_INFO.get('store_hours', '9AM to 9PM')}.", True
+    if "delivery" in message:
+        return STORE_INFO.get("delivery_policy", "We offer fast and reliable delivery services."), True
+    if "location" in message or "address" in message:
+        return f"We are located at {STORE_INFO.get('store_location', 'Address not available.')}", True
+    if "contact" in message:
+        return f"You can reach us at {STORE_INFO.get('phone_number', 'Contact info unavailable.')}", True
+    if "history" in message or "about" in message:
+        return STORE_INFO.get("store_history", "We are proud to serve the community with high-quality halal meat."), True
+    return None, False
+
+def handle_order_flow(message, user_id):
+    cart_key = f"cart_{user_id}"
+    user_key = f"user_{user_id}"
+    cart = cache.get(cart_key) or []
+    user_data = cache.get(user_key) or {}
+    lowered = message.lower()
+
+    if lowered.startswith("add "):
+        product_name = message[4:].strip()
+        matches = fuzzy_product_search(product_name)
+        if matches:
+            name, price, category = matches[0]
+            cart.append((name, price))
+            cache.set(cart_key, cart, timeout=3600)
+            return f"✅ '{name}' has been added to your cart."
+        else:
+            return "❌ Sorry, I couldn’t find that product. Please try again."
+
+    elif "show cart" in lowered or "view cart" in lowered:
+        if not cart:
+            return "🛒 Your cart is currently empty."
+        lines = ["🧾 Your current cart:"]
+        total = 0.0
+        for name, price in cart:
+            lines.append(f"• {name}: {price}")
+            try:
+                total += float(price.replace("£", ""))
+            except:
+                pass
+        lines.append(f"Total: £{total:.2f}")
+        return "
+".join(lines)
+
+    elif "checkout" in lowered:
+        if not cart:
+            return "🛒 Your cart is empty. Add items before checking out."
+        if "name" not in user_data:
+            user_data["stage"] = "awaiting_name"
+            cache.set(user_key, user_data, timeout=3600)
+            return "📝 Please provide your name to proceed with your order."
+        if "address" not in user_data:
+            user_data["stage"] = "awaiting_address"
+            cache.set(user_key, user_data, timeout=3600)
+            return "📍 Please provide your delivery address."
+        if "phone" not in user_data:
+            user_data["stage"] = "awaiting_phone"
+            cache.set(user_key, user_data, timeout=3600)
+            return "📞 What is your contact number?"
+
+        cache.delete(cart_key)
+        cache.delete(user_key)
+        return f"🎉 Thank you {user_data['name']}! Your order has been received. We will deliver to {user_data['address']} and contact you at {user_data['phone']}."
+
+    # Collecting user details
+    if user_data.get("stage") == "awaiting_name":
+        user_data["name"] = message.strip()
+        user_data["stage"] = "awaiting_address"
+        cache.set(user_key, user_data, timeout=3600)
+        return "📍 Thanks! Now please enter your delivery address."
+    if user_data.get("stage") == "awaiting_address":
+        user_data["address"] = message.strip()
+        user_data["stage"] = "awaiting_phone"
+        cache.set(user_key, user_data, timeout=3600)
+        return "📞 Got it. Please enter your contact phone number."
+    if user_data.get("stage") == "awaiting_phone":
+        user_data["phone"] = message.strip()
+        user_data.pop("stage", None)
+        cache.set(user_key, user_data, timeout=3600)
+        return "✅ All details received. You can now type 'checkout' again to confirm your order."
+
+    return None
 
 def find_products(message):
-    """Improved product finder with fuzzy word matching and keyword replies."""
-    message_lower = message.lower()
-    
-    # Simple keyword replies
-    if any(x in message_lower for x in ["store hours", "open", "close"]):
-        return "Our store is open from 9 AM to 9 PM, 7 days a week. Feel free to visit anytime!"
-    if any(x in message_lower for x in ["delivery", "shipping"]):
-        return "We offer fast and reliable delivery. You can check our delivery policies on our website, or I can send you the details right here."
-    if any(x in message_lower for x in ["history", "contact"]):
-        return "Tariq Halal Meatshop has been serving the community with high-quality halal meat since 1990. You can contact us at +44 123 456 789 or visit us in-store!"
-    if any(x in message_lower for x in ["hello", "hi", "hey"]):
-        return "Hello! How can I assist you today? 😊"
-    
-    # Search products with fuzzy matching by words
-    all_product_names = []
-    product_map = {}
-    
-    for category, products in PRODUCT_CATALOG.items():
-        for product in products:
-            name = product.get("name", "").lower()
-            all_product_names.append(name)
-            product_map[name] = (product, category)
-    
-    # Find close matches to message words
-    words = message_lower.split()
-    matched_products = set()
-    for word in words:
-        matches = get_close_matches(word, all_product_names, n=3, cutoff=0.6)
-        for m in matches:
-            matched_products.add(m)
-    
-    if matched_products:
-        results = []
-        for name in matched_products:
-            product, category = product_map[name]
-            results.append(f"- {product['name']} ({category.title()}): {product['price']}")
-        return "Here are some products I found:\n" + "\n".join(results)
-    
-    # If no match found
-    return "Sorry, I couldn’t find any matching products. Could you try a different name or be more specific?"
+    faq_response, is_faq = answer_faqs(message)
+    if is_faq:
+        return faq_response
 
-def generate_ai_response(user_query):
-    """Generate response from OpenAI GPT-3.5 Turbo using store info and product catalog."""
+    results = fuzzy_product_search(message)
+    if results:
+        lines = ["Here are some products I found:"]
+        for name, price, category in results:
+            lines.append(f"- {name} ({category}): {price}")
+        return "\n".join(lines)
+
+    return None
+
+def generate_ai_response(message, memory=[]):
     try:
-        product_catalog_text = format_product_catalog(PRODUCT_CATALOG)
-        store_info_text = format_store_info(STORE_INFO)
-
-        system_message = (
-            "You are a helpful and friendly WhatsApp assistant for Tariq Halal Meats UK. "
-            "Use the info below to answer customer questions clearly, kindly, and professionally.\n\n"
-            f"🏬 STORE INFO:\n{store_info_text}\n\n"
-            f"📦 PRODUCT CATALOG:\n{product_catalog_text}\n\n"
-            "Answer questions about delivery, pricing, hours, or anything else using only this info. "
-            "If you’re not sure, politely say you're unsure."
+        context = (
+            f"You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.\n"
+            f"\nSTORE INFO:\n{format_store_info(STORE_INFO)}"
+            f"\n\nPRODUCT CATALOG:\n{format_product_catalog(PRODUCT_CATALOG)}\n"
+            f"Always respond politely and help the customer even if the question is not perfectly clear."
         )
 
-        response = openai.ChatCompletion.create(
+        messages = [{"role": "system", "content": context}]
+        for past in memory[-5:]:
+            messages.append({"role": "user", "content": past["user"]})
+            messages.append({"role": "assistant", "content": past["bot"]})
+        messages.append({"role": "user", "content": message})
+
+        completion = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_query}
-            ],
-            temperature=0.3,
-            max_tokens=500,
+            messages=messages,
+            temperature=0.4,
+            max_tokens=500
         )
+        return completion.choices[0].message.content.strip()
+    except Exception as e:
+        logger.exception("AI generation failed.")
+        return "Sorry, I had trouble answering that. Please try again."
 
-        return response.choices[0].message["content"].strip()
-
-    except Exception:
-        logger.exception("AI response generation failed.")
-        return "Sorry, I had trouble answering that. Please try again shortly."
-
-# ===== FLASK ROUTES =====
-
+# ========== FLASK ROUTES ==========
 @app.route("/whatsapp", methods=["POST"])
-def handle_whatsapp_message():
-    """Handle incoming WhatsApp messages."""
+def whatsapp_handler():
     try:
-        # Validate request from Twilio
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
         valid = validator.validate(
             request.url,
             request.form,
-            request.headers.get('X-Twilio-Signature', '')
+            request.headers.get("X-Twilio-Signature", "")
         )
         if not valid:
-            logger.warning("Unauthorized request received.")
             return "Unauthorized", 403
 
-        message = request.values.get('Body', '').strip()
+        message = request.values.get("Body", "").strip()
+        from_number = request.values.get("From", "")
+
+        logger.info(f"Incoming from {from_number}: {message}")
+
         if not message:
             return "Empty message", 400
 
-        logger.info(f"Received message: {message}")
+        # Use cache to simulate memory per number
+        session_key = f"session_{from_number}"
+        history = cache.get(session_key) or []
 
-        # Try canned/fuzzy product or info response first
-        product_response = find_products(message)
-        if product_response:
-            reply = product_response
+        # Check for order interaction
+        order_reply = handle_order_flow(message, from_number)
+        if order_reply:
+            reply = order_reply
         else:
-            # Fallback to AI-generated response
-            reply = generate_ai_response(message)
+            reply = find_products(message)
+            if not reply:
+                reply = generate_ai_response(message, memory=history)
 
-        logger.info(f"Replying with: {reply[:100]}...")
+        history.append({"user": message, "bot": reply})
+        cache.set(session_key, history[-10:], timeout=3600)
 
-        twiml = MessagingResponse()
-        twiml.message(reply)
-        return Response(str(twiml), mimetype="application/xml")
-
+        response = MessagingResponse()
+        response.message(reply)
+        return Response(str(response), mimetype="application/xml")
     except Exception as e:
-        logger.error(f"Error in message handling: {e}")
+        logger.error(f"WhatsApp handler error: {e}")
         traceback.print_exc()
         return "Server Error", 500
 
-@app.route("/whatsapp/status", methods=["POST"])
-def handle_status_update():
-    """Log Twilio status updates (optional)."""
-    logger.info(f"Status update: SID={request.values.get('MessageSid', '')}, Status={request.values.get('MessageStatus', '')}")
-    return "OK", 200
-
 @app.route("/health")
-def health_check():
-    """Health check endpoint."""
-    return jsonify({
-        "status": "✅ Online",
-        "openai": bool(OPENAI_API_KEY),
-        "twilio": bool(TWILIO_AUTH_TOKEN)
-    })
+def health():
+    return jsonify({"status": "online"})
 
 @app.route("/")
 def home():
-    """Basic home route."""
-    return "🟢 Tariq Halal Meat Shop WhatsApp Bot is running!"
+    return "🟢 Tariq Halal Meat Shop Chatbot is live."
 
-# ===== RUN APP =====
-
+# ========== MAIN ==========
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),
-        debug=os.getenv("DEBUG", "false").lower() == "true"
-    )
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=True)
