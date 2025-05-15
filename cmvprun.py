@@ -39,7 +39,11 @@ def format_product_catalog(catalog):
     return "\n".join(lines)
 
 def format_store_info(info):
-    return "\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
+    if not isinstance(info, dict):
+        logger.warning("STORE_INFO is not a dictionary. Returning raw text.")
+        return str(info)
+    return "
+".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])"\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
 
 def fuzzy_product_search(query):
     query = query.lower()
@@ -59,6 +63,9 @@ def fuzzy_product_search(query):
 
 def answer_faqs(message):
     message = message.lower()
+    if not isinstance(STORE_INFO, dict):
+        logger.error("STORE_INFO is not a dictionary. Cannot process FAQs.")
+        return "Store information is currently unavailable.", True
     if any(kw in message for kw in ["hours", "opening", "closing"]):
         return f"Our store is open from {STORE_INFO.get('store_hours', '9AM to 9PM')}.", True
     if "delivery" in message:
