@@ -31,12 +31,27 @@ openai.api_key = OPENAI_API_KEY
 # ========== UTILITIES ==========
 
 def format_product_catalog(catalog):
+    if not isinstance(catalog, dict):
+        logger.warning("PRODUCT_CATALOG is not a dictionary.")
+        return "Product catalog is unavailable."
     lines = []
     for category, products in catalog.items():
-        lines.append(f"\n🛒 {category.upper()}:")
+        lines.append(f"
+🛒 {category.upper()}:")
         for product in products:
-            lines.append(f"• {product['name']}: {product['price']}")
-    return "\n".join(lines)
+            if isinstance(product, dict):
+                lines.append(f"• {product.get('name', 'Unnamed')}: {product.get('price', 'N/A')}")
+    return "
+".join(lines)
+    lines = []
+    for category, products in catalog.items():
+        lines.append(f"
+🛒 {category.upper()}:")
+        for product in products:
+            if isinstance(product, dict):
+                lines.append(f"• {product.get('name', 'Unnamed')}: {product.get('price', 'N/A')}")
+    return "
+".join(lines)
 
 def format_store_info(info):
     if not isinstance(info, dict):
@@ -84,14 +99,11 @@ def find_products(message):
 
     results = fuzzy_product_search(message)
     if results:
-        lines = ["Here are some products I found:"]
+        lines = ["🛒 Products matching your query:"]
         for name, price, category in results:
             lines.append(f"- {name} ({category}): {price}")
         return "
 ".join(lines)
-
-    return None
-
     return None
 
 def generate_ai_response(message, memory=[]):
@@ -102,6 +114,34 @@ def generate_ai_response(message, memory=[]):
             f"
 STORE INFO:
 {format_store_info(STORE_INFO)}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
             f"
 
 PRODUCT CATALOG:
@@ -165,6 +205,16 @@ def whatsapp_handler():
 
         logger.info(f"Incoming from {from_number}: {message}")
 
+        # Log all messages
+        log_path = os.path.join("logs", f"chat_{from_number.replace('+', '')}.txt")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as log_file:
+            log_file.write(f"USER: {message}
+")
+        from_number = request.values.get("From", "")
+
+        logger.info(f"Incoming from {from_number}: {message}")
+
         if not message:
             return "Empty message", 400
 
@@ -174,6 +224,9 @@ def whatsapp_handler():
         reply = find_products(message)
         if not reply:
             reply = generate_ai_response(message, memory=history)
+        with open(log_path, "a", encoding="utf-8") as log_file:
+            log_file.write(f"BOT: {reply}
+")
 
         history.append({"user": message, "bot": reply})
         cache.set(session_key, history[-10:], timeout=3600)
@@ -197,3 +250,5 @@ def home():
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=True)
 # Let me know if you'd like me to re-insert the full rest of your app now.
+
+
