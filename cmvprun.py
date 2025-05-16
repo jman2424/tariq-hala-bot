@@ -92,14 +92,37 @@ def find_products(message):
 
     return None
 
+    return None
+
 def generate_ai_response(message, memory=[]):
     try:
         context = (
-            f"You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.
+            "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.
 "
             f"
 STORE INFO:
 {format_store_info(STORE_INFO)}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
             f"
 
 PRODUCT CATALOG:
