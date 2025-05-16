@@ -1,46 +1,38 @@
-# ======================
 # Python
-# ======================
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.so
-*.egg
 *.egg-info/
-dist/
-build/
-env/
-venv/
-.venv/
-pip-wheel-metadata/
 *.log
-*.tmp
 
-# ======================
-# Environment variables
-# ======================
+# Environment
 .env
 
-# ======================
-# AI/LLM model files
-# ======================
-*.gguf
-*.dll
-*.bin
-*.h5
-*.tar
-*.zip
-*.pkl
-*.dat
+# Flask / Local Files
+instance/
+*.db
+*.sqlite3
+*.bak
 
-# ======================
-# Project-specific
-# ======================
-gpt4all/
+# Logs and sessions
+logs/
+*.log
+*.pid
 
-# ======================
-# OS-generated files
-# ======================
+# Virtualenv
+.venv/
+env/
+venv/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+
+# Mac and system files
 .DS_Store
 Thumbs.db
+
+# Render or deployment configs
+*.render-build.yaml
