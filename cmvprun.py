@@ -40,7 +40,9 @@ def format_product_catalog(catalog):
 🛒 {category.upper()}:")
         for product in products:
             if isinstance(product, dict):
-                lines.append(f"• {product.get('name', 'Unnamed')}: {product.get('price', 'N/A')}")
+                name = product.get('name', 'Unnamed')
+                price = product.get('price', 'N/A')
+                lines.append(f"• {name}: {price}")
     return "
 ".join(lines)
     lines = []
@@ -114,6 +116,13 @@ def generate_ai_response(message, memory=[]):
             f"
 STORE INFO:
 {format_store_info(STORE_INFO)}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}"
+            "
+Always respond politely and help the customer even if the question is not perfectly clear."
+        )}"
             f"
 
 PRODUCT CATALOG:
@@ -249,6 +258,5 @@ def home():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=True)
-# Let me know if you'd like me to re-insert the full rest of your app now.
 
 
