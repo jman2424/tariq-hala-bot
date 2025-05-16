@@ -42,8 +42,7 @@ def format_store_info(info):
     if not isinstance(info, dict):
         logger.warning("STORE_INFO is not a dictionary. Returning raw text.")
         return str(info)
-    return "
-".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])"\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
+    return "\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
 
 def fuzzy_product_search(query):
     query = query.lower()
@@ -78,81 +77,6 @@ def answer_faqs(message):
         return STORE_INFO.get("store_history", "We are proud to serve the community with high-quality halal meat."), True
     return None, False
 
-def handle_order_flow(message, user_id):
-    cart_key = f"cart_{user_id}"
-    user_key = f"user_{user_id}"
-    cart = cache.get(cart_key) or []
-    if not isinstance(cart, list):
-        cart = []
-    user_data = cache.get(user_key) or {}
-    if not isinstance(user_data, dict):
-        user_data = {}
-    lowered = message.lower()
-
-    if lowered.startswith("add "):
-        product_name = message[4:].strip()
-        matches = fuzzy_product_search(product_name)
-        if matches:
-            name, price, category = matches[0]
-            cart.append((name, price))
-            cache.set(cart_key, cart, timeout=3600)
-            return f"✅ '{name}' has been added to your cart."
-        else:
-            return "❌ Sorry, I couldn’t find that product. Please try again."
-
-    elif "show cart" in lowered or "view cart" in lowered:
-        if not cart:
-            return "🛒 Your cart is currently empty."
-        lines = ["🧾 Your current cart:"]
-        total = 0.0
-        for name, price in cart:
-            lines.append(f"• {name}: {price}")
-            try:
-                total += float(price.replace("£", ""))
-            except Exception as e:
-                logger.warning(f"Could not parse price for {name}: {e}")
-        lines.append(f"Total: £{total:.2f}")
-        return "\n".join(lines)
-
-    elif "checkout" in lowered:
-        if not cart:
-            return "🛒 Your cart is empty. Add items before checking out."
-        if "name" not in user_data:
-            user_data["stage"] = "awaiting_name"
-            cache.set(user_key, user_data, timeout=3600)
-            return "📝 Please provide your name to proceed with your order."
-        if "address" not in user_data:
-            user_data["stage"] = "awaiting_address"
-            cache.set(user_key, user_data, timeout=3600)
-            return "📍 Please provide your delivery address."
-        if "phone" not in user_data:
-            user_data["stage"] = "awaiting_phone"
-            cache.set(user_key, user_data, timeout=3600)
-            return "📞 What is your contact number?"
-
-        cache.delete(cart_key)
-        cache.delete(user_key)
-        return f"🎉 Thank you {user_data['name']}! Your order has been received. We will deliver to {user_data['address']} and contact you at {user_data['phone']}."
-
-    # Collecting user details
-    if user_data.get("stage") == "awaiting_name":
-        user_data["name"] = message.strip()
-        user_data["stage"] = "awaiting_address"
-        cache.set(user_key, user_data, timeout=3600)
-        return "📍 Thanks! Now please enter your delivery address."
-    if user_data.get("stage") == "awaiting_address":
-        user_data["address"] = message.strip()
-        user_data["stage"] = "awaiting_phone"
-        cache.set(user_key, user_data, timeout=3600)
-        return "📞 Got it. Please enter your contact phone number."
-    if user_data.get("stage") == "awaiting_phone":
-        user_data["phone"] = message.strip()
-        user_data.pop("stage", None)
-        cache.set(user_key, user_data, timeout=3600)
-        return "✅ All details received. You can now type 'checkout' again to confirm your order."
-
-    return None
-
 def find_products(message):
     faq_response, is_faq = answer_faqs(message)
     if is_faq:
@@ -163,16 +87,24 @@ def find_products(message):
         lines = ["Here are some products I found:"]
         for name, price, category in results:
             lines.append(f"- {name} ({category}): {price}")
-        return "\n".join(lines)
+        return "
+".join(lines)
 
     return None
 
 def generate_ai_response(message, memory=[]):
     try:
         context = (
-            f"You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.\n"
-            f"\nSTORE INFO:\n{format_store_info(STORE_INFO)}"
-            f"\n\nPRODUCT CATALOG:\n{format_product_catalog(PRODUCT_CATALOG)}\n"
+            f"You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.
+"
+            f"
+STORE INFO:
+{format_store_info(STORE_INFO)}"
+            f"
+
+PRODUCT CATALOG:
+{format_product_catalog(PRODUCT_CATALOG)}
+"
             f"Always respond politely and help the customer even if the question is not perfectly clear."
         )
 
@@ -193,7 +125,6 @@ def generate_ai_response(message, memory=[]):
         logger.exception("AI generation failed.")
         return "Sorry, I had trouble answering that. Please try again."
 
-# ========== FLASK ROUTES ==========
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_handler():
     try:
@@ -214,18 +145,12 @@ def whatsapp_handler():
         if not message:
             return "Empty message", 400
 
-        # Use cache to simulate memory per number
         session_key = f"session_{from_number}"
         history = cache.get(session_key) or []
 
-        # Check for order interaction
-        order_reply = handle_order_flow(message, from_number)
-        if order_reply:
-            reply = order_reply
-        else:
-            reply = find_products(message)
-            if not reply:
-                reply = generate_ai_response(message, memory=history)
+        reply = find_products(message)
+        if not reply:
+            reply = generate_ai_response(message, memory=history)
 
         history.append({"user": message, "bot": reply})
         cache.set(session_key, history[-10:], timeout=3600)
@@ -246,6 +171,6 @@ def health():
 def home():
     return "🟢 Tariq Halal Meat Shop Chatbot is live."
 
-# ========== MAIN ==========
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=True)
+# Let me know if you'd like me to re-insert the full rest of your app now.
