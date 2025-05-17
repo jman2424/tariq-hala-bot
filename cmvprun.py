@@ -106,9 +106,11 @@ def generate_ai_response(message, memory=[]):
         )
 
         messages = [
-            {"role": "system", "content": context},
-            *[{"role": "user", "content": m["user"]}, {"role": "assistant", "content": m["bot"]}] for m in memory[-5:]
-        ] + [{"role": "user", "content": message}]
+            {"role": "system", "content": context}
+        ] + [msg for m in memory[-5:] for msg in (
+            {"role": "user", "content": m["user"]},
+            {"role": "assistant", "content": m["bot"]}
+        )] + [{"role": "user", "content": message}]
 
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
