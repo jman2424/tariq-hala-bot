@@ -36,13 +36,13 @@ def format_product_catalog(catalog):
         return "Product catalog is unavailable."
     lines = []
     for category, products in catalog.items():
-        lines.append(f"
-🛒 {category.upper()}:")
+        lines.append("
+🛒 {}:".format(category.upper()))
         for product in products:
             if isinstance(product, dict):
                 name = product.get('name', 'Unnamed')
                 price = product.get('price', 'N/A')
-                lines.append(f"• {name}: {price}")
+                lines.append("• {}: {}".format(name, price))
     return "
 ".join(lines)
     lines = []
@@ -103,7 +103,7 @@ def find_products(message):
     if results:
         lines = ["🛒 Products matching your query:"]
         for name, price, category in results:
-            lines.append(f"- {name} ({category}): {price}")
+            lines.append("- {} ({}): {}".format(name, category, price))
         return "
 ".join(lines)
     return None
@@ -113,13 +113,13 @@ def generate_ai_response(message, memory=[]):
         context = (
             "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.
 "
-            f"
+            "
 STORE INFO:
-{format_store_info(STORE_INFO)}"
-            f"
+{}".format(format_store_info(STORE_INFO)) +
+            "
 
 PRODUCT CATALOG:
-{format_product_catalog(PRODUCT_CATALOG)}"
+{}".format(format_product_catalog(PRODUCT_CATALOG)) +
             "
 Always respond politely and help the customer even if the question is not perfectly clear."
         )
@@ -139,5 +139,5 @@ Always respond politely and help the customer even if the question is not perfec
         return completion.choices[0].message.content.strip()
     except Exception as e:
         logger.exception("AI generation failed.")
-        return "Sorry, I had trouble answering that. Please try again.", debug=True)
+        return "Sorry, I had trouble answering that. Please try again."
 
