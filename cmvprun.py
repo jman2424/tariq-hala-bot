@@ -1,7 +1,7 @@
 import os
 import traceback
 import logging
-from flask import Flask, request, jsonify, Response, session
+from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
@@ -122,3 +122,52 @@ def generate_ai_response(message, memory=[]):
         logger.exception("AI generation failed.")
         return "Sorry, I had trouble answering that. Please try again."
 
+# ========== ROUTES ==========
+@app.route("/whatsapp", methods=["POST"])
+def whatsapp_handler():
+    try:
+        validator = RequestValidator(TWILIO_AUTH_TOKEN)
+        valid = validator.validate(
+            request.url,
+            request.form,
+            request.headers.get("X-Twilio-Signature", "")
+        )
+        if not valid:
+            return "Unauthorized", 403
+
+        message = request.values.get("Body", "").strip()
+        from_number = request.values.get("From", "")
+        logger.info("Incoming from {}: {}".format(from_number, message))
+
+        if not message:
+            return "Empty message", 400
+
+        session_key = f"session_{from_number}"
+        history = cache.get(session_key) or []
+
+        reply = find_products(message)
+        if not reply:
+            reply = generate_ai_response(message, memory=history)
+
+        history.append({"user": message, "bot": reply})
+        cache.set(session_key, history[-10:], timeout=3600)
+
+        response = MessagingResponse()
+        response.message(reply)
+        return Response(str(response), mimetype="application/xml")
+    except Exception as e:
+        logger.error(f"WhatsApp handler error: {e}")
+        traceback.print_exc()
+        return "Server Error", 500
+
+@app.route("/")
+def home():
+    return "🟢 Tariq Halal Meat Shop Chatbot is live."
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "online"})
+
+# ========== MAIN ==========
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=True)
