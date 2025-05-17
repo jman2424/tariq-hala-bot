@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 from difflib import get_close_matches
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== UTILITIES ==========
 
