@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== UTILITIES ==========
 
@@ -105,19 +105,18 @@ def generate_ai_response(message, memory=[]):
             "\nAlways respond politely and help the customer even if the question is not perfectly clear."
         )
 
-        messages = [{"role": "system", "content": context}]
-        for past in memory[-5:]:
-            messages.append({"role": "user", "content": past["user"]})
-            messages.append({"role": "assistant", "content": past["bot"]})
-        messages.append({"role": "user", "content": message})
+        messages = [
+            {"role": "system", "content": context},
+            *[{"role": "user", "content": m["user"]}, {"role": "assistant", "content": m["bot"]}] for m in memory[-5:]
+        ] + [{"role": "user", "content": message}]
 
-        completion = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
             temperature=0.4,
             max_tokens=500
         )
-        return completion.choices[0].message.content.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         logger.exception("AI generation failed.")
         return "Sorry, I had trouble answering that. Please try again."
@@ -156,7 +155,7 @@ def whatsapp_handler():
         response.message(reply)
         return Response(str(response), mimetype="application/xml")
     except Exception as e:
-        logger.error(f"WhatsApp handler error: {e}")
+        logger.error("WhatsApp handler error: {}".format(e))
         traceback.print_exc()
         return "Server Error", 500
 
