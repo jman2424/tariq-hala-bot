@@ -36,30 +36,19 @@ def format_product_catalog(catalog):
         return "Product catalog is unavailable."
     lines = []
     for category, products in catalog.items():
-        lines.append("
-🛒 {}:".format(category.upper()))
+        lines.append("\n🛒 {}:".format(category.upper()))
         for product in products:
             if isinstance(product, dict):
                 name = product.get('name', 'Unnamed')
                 price = product.get('price', 'N/A')
                 lines.append("• {}: {}".format(name, price))
-    return "
-".join(lines)
-    lines = []
-    for category, products in catalog.items():
-        lines.append(f"
-🛒 {category.upper()}:")
-        for product in products:
-            if isinstance(product, dict):
-                lines.append(f"• {product.get('name', 'Unnamed')}: {product.get('price', 'N/A')}")
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 def format_store_info(info):
     if not isinstance(info, dict):
         logger.warning("STORE_INFO is not a dictionary. Returning raw text.")
         return str(info)
-    return "\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
+    return "\n".join(["{}: {}".format(key.replace('_', ' ').title(), value) for key, value in info.items()])
 
 def fuzzy_product_search(query):
     query = query.lower()
@@ -83,13 +72,13 @@ def answer_faqs(message):
         logger.error("STORE_INFO is not a dictionary. Cannot process FAQs.")
         return "Store information is currently unavailable.", True
     if any(kw in message for kw in ["hours", "opening", "closing"]):
-        return f"Our store is open from {STORE_INFO.get('store_hours', '9AM to 9PM')}.", True
+        return "Our store is open from {}.".format(STORE_INFO.get('store_hours', '9AM to 9PM')), True
     if "delivery" in message:
         return STORE_INFO.get("delivery_policy", "We offer fast and reliable delivery services."), True
     if "location" in message or "address" in message:
-        return f"We are located at {STORE_INFO.get('store_location', 'Address not available.')}", True
+        return "We are located at {}".format(STORE_INFO.get('store_location', 'Address not available.')), True
     if "contact" in message:
-        return f"You can reach us at {STORE_INFO.get('phone_number', 'Contact info unavailable.')}", True
+        return "You can reach us at {}".format(STORE_INFO.get('phone_number', 'Contact info unavailable.')), True
     if "history" in message or "about" in message:
         return STORE_INFO.get("store_history", "We are proud to serve the community with high-quality halal meat."), True
     return None, False
@@ -104,24 +93,16 @@ def find_products(message):
         lines = ["🛒 Products matching your query:"]
         for name, price, category in results:
             lines.append("- {} ({}): {}".format(name, category, price))
-        return "
-".join(lines)
+        return "\n".join(lines)
     return None
 
 def generate_ai_response(message, memory=[]):
     try:
         context = (
-            "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.
-"
-            "
-STORE INFO:
-{}".format(format_store_info(STORE_INFO)) +
-            "
-
-PRODUCT CATALOG:
-{}".format(format_product_catalog(PRODUCT_CATALOG)) +
-            "
-Always respond politely and help the customer even if the question is not perfectly clear."
+            "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.\n"
+            "\nSTORE INFO:\n{}".format(format_store_info(STORE_INFO)) +
+            "\n\nPRODUCT CATALOG:\n{}".format(format_product_catalog(PRODUCT_CATALOG)) +
+            "\nAlways respond politely and help the customer even if the question is not perfectly clear."
         )
 
         messages = [{"role": "system", "content": context}]
