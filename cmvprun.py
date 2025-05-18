@@ -7,7 +7,7 @@ from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 from difflib import get_close_matches
-import openai
+from openai import OpenAI  # ✅ NEW CLIENT CLASS
 
 # Load environment variables
 load_dotenv()
@@ -24,7 +24,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TariqBot")
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-openai.api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# ✅ Instantiate OpenAI client (modern SDK)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== UTILITIES ==========
 
@@ -126,7 +129,7 @@ def generate_ai_response(message, memory=[]):
             messages.append({"role": "assistant", "content": entry["bot"]})
         messages.append({"role": "user", "content": message})
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
             temperature=0.4,
@@ -184,3 +187,4 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
+
