@@ -9,20 +9,20 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from difflib import get_close_matches
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# Import store data
+# Store and product data
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# ========== CONFIG ==========
+# ========== APP SETUP ==========
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("TariqBot")
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -32,31 +32,26 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 def format_product_catalog(catalog):
     if not isinstance(catalog, dict):
-        logger.warning("PRODUCT_CATALOG is not a dictionary.")
-        return "Product catalog is unavailable."
+        return "Product catalog unavailable."
     lines = []
     for category, products in catalog.items():
-        lines.append("\n🛒 {}:".format(category.upper()))
+        lines.append(f"\n🛒 {category.upper()}:")
         for product in products:
-            if isinstance(product, dict):
-                name = product.get('name', 'Unnamed')
-                price = product.get('price', 'N/A')
-                lines.append("• {}: {}".format(name, price))
+            name = product.get('name', 'Unnamed')
+            price = product.get('price', 'N/A')
+            lines.append(f"• {name}: {price}")
     return "\n".join(lines)
 
 def format_store_info(info):
     if not isinstance(info, dict):
-        logger.warning("STORE_INFO is not a dictionary. Returning raw text.")
         return str(info)
-    return "\n".join(["{}: {}".format(key.replace('_', ' ').title(), value) for key, value in info.items()])
+    return "\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
 
 def fuzzy_product_search(query):
     query = query.lower()
     results = []
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
-            if not isinstance(product, dict):
-                continue
             name = product.get('name', '').lower()
             if query in name or query in category.lower():
                 results.append((product['name'], product['price'], category.title()))
@@ -69,30 +64,29 @@ def fuzzy_product_search(query):
 def answer_faqs(message):
     message = message.lower()
     if not isinstance(STORE_INFO, dict):
-        logger.error("STORE_INFO is not a dictionary. Cannot process FAQs.")
-        return "Store information is currently unavailable.", True
-    if any(kw in message for kw in ["hours", "opening", "closing"]):
-        return "Our store is open from {}.".format(STORE_INFO.get('store_hours', '9AM to 9PM')), True
+        return "Store information currently unavailable.", True
+    if any(word in message for word in ["hours", "opening", "closing"]):
+        return f"Our store is open from {STORE_INFO.get('store_hours', '9AM to 9PM')}.", True
     if "delivery" in message:
-        return STORE_INFO.get("delivery_policy", "We offer fast and reliable delivery services."), True
+        return STORE_INFO.get("delivery_policy", "We offer fast delivery."), True
     if "location" in message or "address" in message:
-        return "We are located at {}".format(STORE_INFO.get('store_location', 'Address not available.')), True
+        return f"We are located at {STORE_INFO.get('store_location', 'Address not available.')}", True
     if "contact" in message:
-        return "You can reach us at {}".format(STORE_INFO.get('phone_number', 'Contact info unavailable.')), True
+        return f"You can reach us at {STORE_INFO.get('phone_number', 'Unavailable')}", True
     if "history" in message or "about" in message:
-        return STORE_INFO.get("store_history", "We are proud to serve the community with high-quality halal meat."), True
+        return STORE_INFO.get("store_history", "We are proud to serve our community with halal meats."), True
     return None, False
 
 def find_products(message):
-    faq_response, is_faq = answer_faqs(message)
+    faq, is_faq = answer_faqs(message)
     if is_faq:
-        return faq_response
+        return faq
 
-    results = fuzzy_product_search(message)
-    if results:
+    matches = fuzzy_product_search(message)
+    if matches:
         lines = ["🛒 Products matching your query:"]
-        for name, price, category in results:
-            lines.append("- {} ({}): {}".format(name, category, price))
+        for name, price, category in matches:
+            lines.append(f"- {name} ({category}): {price}")
         return "\n".join(lines)
     return None
 
@@ -100,17 +94,16 @@ def generate_ai_response(message, memory=[]):
     try:
         context = (
             "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.\n"
-            "\nSTORE INFO:\n{}".format(format_store_info(STORE_INFO)) +
-            "\n\nPRODUCT CATALOG:\n{}".format(format_product_catalog(PRODUCT_CATALOG)) +
-            "\nAlways respond politely and help the customer even if the question is not perfectly clear."
+            f"\nSTORE INFO:\n{format_store_info(STORE_INFO)}"
+            f"\n\nPRODUCT CATALOG:\n{format_product_catalog(PRODUCT_CATALOG)}"
+            "\nAlways respond politely and clearly."
         )
 
-        messages = [
-            {"role": "system", "content": context}
-        ] + [msg for m in memory[-5:] for msg in (
-            {"role": "user", "content": m["user"]},
-            {"role": "assistant", "content": m["bot"]}
-        )] + [{"role": "user", "content": message}]
+        messages = [{"role": "system", "content": context}]
+        for entry in memory[-5:]:
+            messages.append({"role": "user", "content": entry["user"]})
+            messages.append({"role": "assistant", "content": entry["bot"]})
+        messages.append({"role": "user", "content": message})
 
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -120,29 +113,28 @@ def generate_ai_response(message, memory=[]):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.exception("AI generation failed.")
-        return "Sorry, I had trouble answering that. Please try again."
+        logger.exception("AI response failed")
+        return "Sorry, I'm having trouble right now. Please try again later."
 
 # ========== ROUTES ==========
+
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_handler():
     try:
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
-        valid = validator.validate(
+        if not validator.validate(
             request.url,
             request.form,
             request.headers.get("X-Twilio-Signature", "")
-        )
-        if not valid:
+        ):
             return "Unauthorized", 403
 
         message = request.values.get("Body", "").strip()
         from_number = request.values.get("From", "")
-        logger.info("Incoming from {}: {}".format(from_number, message))
-
         if not message:
             return "Empty message", 400
 
+        logger.info(f"Message from {from_number}: {message}")
         session_key = f"session_{from_number}"
         history = cache.get(session_key) or []
 
@@ -153,12 +145,11 @@ def whatsapp_handler():
         history.append({"user": message, "bot": reply})
         cache.set(session_key, history[-10:], timeout=3600)
 
-        response = MessagingResponse()
-        response.message(reply)
-        return Response(str(response), mimetype="application/xml")
+        twiml = MessagingResponse()
+        twiml.message(reply)
+        return Response(str(twiml), mimetype="application/xml")
     except Exception as e:
-        logger.error("WhatsApp handler error: {}".format(e))
-        traceback.print_exc()
+        logger.exception("WhatsApp handler failed")
         return "Server Error", 500
 
 @app.route("/")
@@ -171,4 +162,4 @@ def health():
 
 # ========== MAIN ==========
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=True)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
