@@ -7,16 +7,15 @@ from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 from difflib import get_close_matches
-from openai import OpenAI
+import openai
 
-# Load environment
+# Load environment variables
 load_dotenv()
 
-# Import your store/product data
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# ========== APP SETUP ==========
+# ========== APP CONFIG ==========
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
@@ -25,8 +24,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TariqBot")
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # ========== UTILITIES ==========
 
@@ -66,8 +64,7 @@ def search_by_category(message):
     categories = PRODUCT_CATALOG.keys()
     match = get_close_matches(message, categories, n=1, cutoff=0.6)
     if match:
-        cat = match[0]
-        return format_category_products(cat, PRODUCT_CATALOG[cat])
+        return format_category_products(match[0], PRODUCT_CATALOG[match[0]])
     for cat in categories:
         if cat.lower() in message:
             return format_category_products(cat, PRODUCT_CATALOG[cat])
@@ -129,7 +126,7 @@ def generate_ai_response(message, memory=[]):
             messages.append({"role": "assistant", "content": entry["bot"]})
         messages.append({"role": "user", "content": message})
 
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=messages,
             temperature=0.4,
