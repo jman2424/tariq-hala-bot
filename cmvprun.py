@@ -9,10 +9,9 @@ import openai
 from dotenv import load_dotenv
 from difflib import get_close_matches
 
-# Load environment variables
+# Load .env
 load_dotenv()
 
-# Store data
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
@@ -25,8 +24,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TariqBot")
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY  # ✅ PROPERLY SET FOR SDK V1+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # ========== UTILITIES ==========
 
@@ -37,21 +35,69 @@ def format_product_catalog(catalog):
     for category, products in catalog.items():
         lines.append(f"\n🛒 {category.upper()}:")
         for product in products:
+            if isinstance(product, str):
+                product = {"name": product, "price": "N/A"}
             name = product.get('name', 'Unnamed')
             price = product.get('price', 'N/A')
             lines.append(f"• {name}: {price}")
     return "\n".join(lines)
 
 def format_store_info(info):
-    if not isinstance(info, dict):
-        return str(info)
-    return "\n".join([f"{key.replace('_', ' ').title()}: {value}" for key, value in info.items()])
+    return "\n".join([f"{k.replace('_',' ').title()}: {v}" for k, v in info.items()])
+
+def answer_faqs(message):
+    message = message.lower()
+    if "hours" in message or "opening" in message or "closing" in message:
+        return f"Our store is open from {STORE_INFO.get('store_hours', '9AM to 9PM')}.", True
+    if "delivery" in message:
+        return STORE_INFO.get("delivery_policy", "We offer fast delivery."), True
+    if "location" in message or "address" in message:
+        return f"We are located at {STORE_INFO.get('store_location', 'Address not available.')}", True
+    if "contact" in message:
+        return f"You can reach us at {STORE_INFO.get('phone_number', 'Unavailable')}", True
+    if "history" in message or "about" in message:
+        return STORE_INFO.get("store_history", "We are proud to serve the community."), True
+    return None, False
+
+def search_by_category(message):
+    message = message.lower()
+    categories = PRODUCT_CATALOG.keys()
+    match = get_close_matches(message, categories, n=1, cutoff=0.6)
+    if match:
+        cat = match[0]
+        products = PRODUCT_CATALOG[cat]
+        lines = [f"🛒 Products in {cat.title()}:"]
+        for product in products:
+            if isinstance(product, str):
+                product = {"name": product, "price": "N/A"}
+            name = product.get('name', 'Unnamed')
+            price = product.get('price', 'N/A')
+            lines.append(f"- {name}: {price}")
+        return "\n".join(lines)
+    
+    # Check if any category is mentioned in the message text
+    for cat in categories:
+        if cat.lower() in message:
+            products = PRODUCT_CATALOG[cat]
+            lines = [f"🛒 Products in {cat.title()}:"]
+            for product in products:
+                if isinstance(product, str):
+                    product = {"name": product, "price": "N/A"}
+                name = product.get('name', 'Unnamed')
+                price = product.get('price', 'N/A')
+                lines.append(f"- {name}: {price}")
+            return "\n".join(lines)
+    return None
 
 def fuzzy_product_search(query):
     query = query.lower()
     results = []
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
+            if isinstance(product, str):
+                product = {"name": product, "price": "N/A"}
+            if not isinstance(product, dict):
+                continue
             name = product.get('name', '').lower()
             if query in name or query in category.lower():
                 results.append((product['name'], product['price'], category.title()))
@@ -61,26 +107,14 @@ def fuzzy_product_search(query):
                     results.append((product['name'], product['price'], category.title()))
     return results if results else None
 
-def answer_faqs(message):
-    message = message.lower()
-    if not isinstance(STORE_INFO, dict):
-        return "Store information currently unavailable.", True
-    if any(word in message for word in ["hours", "opening", "closing"]):
-        return f"Our store is open from {STORE_INFO.get('store_hours', '9AM to 9PM')}.", True
-    if "delivery" in message:
-        return STORE_INFO.get("delivery_policy", "We offer fast delivery."), True
-    if "location" in message or "address" in message:
-        return f"We are located at {STORE_INFO.get('store_location', 'Address not available.')}", True
-    if "contact" in message:
-        return f"You can reach us at {STORE_INFO.get('phone_number', 'Unavailable')}", True
-    if "history" in message or "about" in message:
-        return STORE_INFO.get("store_history", "We are proud to serve our community with halal meats."), True
-    return None, False
-
 def find_products(message):
     faq, is_faq = answer_faqs(message)
     if is_faq:
         return faq
+
+    cat_results = search_by_category(message)
+    if cat_results:
+        return cat_results
 
     matches = fuzzy_product_search(message)
     if matches:
@@ -113,6 +147,7 @@ def generate_ai_response(message, memory=[]):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
+        logger.error(f"AI request failed on: {message}\nMemory: {memory}")
         logger.exception("AI response failed")
         return "Sorry, I'm having trouble right now. Please try again later."
 
@@ -160,6 +195,5 @@ def home():
 def health():
     return jsonify({"status": "online"})
 
-# ========== MAIN ==========
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
