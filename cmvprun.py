@@ -5,17 +5,18 @@ from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
-import openai
 from dotenv import load_dotenv
 from difflib import get_close_matches
+from openai import OpenAI
 
-# Load .env
+# Load environment
 load_dotenv()
 
+# Import your store/product data
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# ========== CONFIG ==========
+# ========== APP SETUP ==========
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
@@ -24,7 +25,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TariqBot")
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-openai.api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== UTILITIES ==========
 
@@ -65,29 +67,21 @@ def search_by_category(message):
     match = get_close_matches(message, categories, n=1, cutoff=0.6)
     if match:
         cat = match[0]
-        products = PRODUCT_CATALOG[cat]
-        lines = [f"🛒 Products in {cat.title()}:"]
-        for product in products:
-            if isinstance(product, str):
-                product = {"name": product, "price": "N/A"}
-            name = product.get('name', 'Unnamed')
-            price = product.get('price', 'N/A')
-            lines.append(f"- {name}: {price}")
-        return "\n".join(lines)
-    
-    # Check if any category is mentioned in the message text
+        return format_category_products(cat, PRODUCT_CATALOG[cat])
     for cat in categories:
         if cat.lower() in message:
-            products = PRODUCT_CATALOG[cat]
-            lines = [f"🛒 Products in {cat.title()}:"]
-            for product in products:
-                if isinstance(product, str):
-                    product = {"name": product, "price": "N/A"}
-                name = product.get('name', 'Unnamed')
-                price = product.get('price', 'N/A')
-                lines.append(f"- {name}: {price}")
-            return "\n".join(lines)
+            return format_category_products(cat, PRODUCT_CATALOG[cat])
     return None
+
+def format_category_products(category, products):
+    lines = [f"🛒 Products in {category.title()}:"]
+    for product in products:
+        if isinstance(product, str):
+            product = {"name": product, "price": "N/A"}
+        name = product.get('name', 'Unnamed')
+        price = product.get('price', 'N/A')
+        lines.append(f"- {name}: {price}")
+    return "\n".join(lines)
 
 def fuzzy_product_search(query):
     query = query.lower()
@@ -96,8 +90,6 @@ def fuzzy_product_search(query):
         for product in products:
             if isinstance(product, str):
                 product = {"name": product, "price": "N/A"}
-            if not isinstance(product, dict):
-                continue
             name = product.get('name', '').lower()
             if query in name or query in category.lower():
                 results.append((product['name'], product['price'], category.title()))
@@ -111,11 +103,9 @@ def find_products(message):
     faq, is_faq = answer_faqs(message)
     if is_faq:
         return faq
-
     cat_results = search_by_category(message)
     if cat_results:
         return cat_results
-
     matches = fuzzy_product_search(message)
     if matches:
         lines = ["🛒 Products matching your query:"]
@@ -139,7 +129,7 @@ def generate_ai_response(message, memory=[]):
             messages.append({"role": "assistant", "content": entry["bot"]})
         messages.append({"role": "user", "content": message})
 
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
             temperature=0.4,
