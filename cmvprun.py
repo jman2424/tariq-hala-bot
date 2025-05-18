@@ -5,18 +5,18 @@ from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
-from openai import OpenAI
+import openai
 from dotenv import load_dotenv
 from difflib import get_close_matches
 
 # Load environment variables
 load_dotenv()
 
-# Store and product data
+# Store data
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# ========== APP SETUP ==========
+# ========== CONFIG ==========
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
@@ -26,7 +26,7 @@ logger = logging.getLogger("TariqBot")
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = OPENAI_API_KEY  # ✅ PROPERLY SET FOR SDK V1+
 
 # ========== UTILITIES ==========
 
@@ -105,7 +105,7 @@ def generate_ai_response(message, memory=[]):
             messages.append({"role": "assistant", "content": entry["bot"]})
         messages.append({"role": "user", "content": message})
 
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=messages,
             temperature=0.4,
