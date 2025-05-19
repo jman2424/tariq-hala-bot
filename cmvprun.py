@@ -15,8 +15,17 @@ from openai import OpenAI
 load_dotenv()
 
 from store_info import store_info as STORE_INFO
-from store_info import store_locations as STORE_LOCATIONS
 from product_catalog import PRODUCT_CATALOG
+
+# Add store_locations manually from branches in STORE_INFO
+store_locations = {
+    branch: {
+        "address": details.split("|")[0].strip(),
+        "postcode": details.split(",")[-1].strip().split(" ")[0],
+        "hours": STORE_INFO.get("store_hours", "9AM to 9PM")
+    }
+    for branch, details in STORE_INFO.get("branches", {}).items()
+}
 
 # ========== APP CONFIG ==========
 app = Flask(__name__)
@@ -53,7 +62,7 @@ def get_uk_time():
     return uk_time.strftime("%A, %d %B %Y, %I:%M %p")
 
 def locate_store_by_postcode(message):
-    for area, data in STORE_LOCATIONS.items():
+    for area, data in store_locations.items():
         if area.lower() in message.lower() or data.get("postcode", "").lower() in message.lower():
             return f"Closest store: {area}\nAddress: {data['address']}\nHours: {data['hours']}"
     return None
@@ -83,7 +92,7 @@ def answer_faqs(message):
         store_reply = locate_store_by_postcode(msg)
         return (store_reply or f"Main store is at {STORE_INFO.get('store_location', 'Address not available.')}"), True
     if "contact" in msg:
-        return f"Contact us at {STORE_INFO.get('phone_number', 'Unavailable')}", True
+        return f"Contact us at {STORE_INFO.get('contact', 'Unavailable')}", True
     if "history" in msg or "about" in msg:
         return STORE_INFO.get("store_history", "We are proud to serve the community."), True
     return None, False
@@ -208,3 +217,4 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
+
