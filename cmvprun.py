@@ -10,6 +10,7 @@ from difflib import get_close_matches
 from datetime import datetime
 import pytz
 from openai import OpenAI
+from rapidfuzz import process
 
 # Load environment variables
 load_dotenv()
@@ -17,7 +18,6 @@ load_dotenv()
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# Add store_locations manually from branches in STORE_INFO
 store_locations = {
     branch: {
         "address": details.split("|")[0].strip(),
@@ -27,7 +27,6 @@ store_locations = {
     for branch, details in STORE_INFO.get("branches", {}).items()
 }
 
-# ========== APP CONFIG ==========
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
@@ -39,7 +38,6 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# ========== NORMALIZE PRODUCT CATALOG ==========
 for category, products in PRODUCT_CATALOG.items():
     if isinstance(products, dict):
         normalized = []
@@ -91,10 +89,7 @@ def answer_faqs(message):
 
 def search_by_category(message):
     message = message.lower()
-    for cat in PRODUCT_CATALOG.keys():
-        if cat.lower() in message:
-            return format_category_products(cat, PRODUCT_CATALOG[cat])
-    match = get_close_matches(message, PRODUCT_CATALOG.keys(), n=1, cutoff=0.6)
+    match = process.extractOne(message, PRODUCT_CATALOG.keys(), score_cutoff=60)
     if match:
         return format_category_products(match[0], PRODUCT_CATALOG[match[0]])
     return None
@@ -112,12 +107,9 @@ def fuzzy_product_search(query):
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
             name = product.get('name', '').lower()
-            if query in name or query in category.lower():
+            match_score = process.extractOne(query, [name])
+            if match_score and match_score[1] > 65:
                 results.append((product['name'], product['price'], category.title()))
-            else:
-                match = get_close_matches(query, [name], n=1, cutoff=0.65)
-                if match:
-                    results.append((product['name'], product['price'], category.title()))
     return results if results else None
 
 def find_products(message):
@@ -157,13 +149,11 @@ def generate_ai_response(message, memory=[]):
             temperature=0.4,
             max_tokens=500
         )
-        return response.choices[0].message.content.strip()
+        return response.choices[0].message.content.strip() + "\n\nWas this helpful? Reply YES or NO."
     except Exception as e:
         logger.error(f"AI request failed on: {message}\nMemory: {memory}")
         logger.exception("AI response failed")
         return "Sorry, I'm having trouble right now. Please try again later."
-
-# ========== ROUTES ==========
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_handler():
@@ -185,12 +175,16 @@ def whatsapp_handler():
         session_key = f"session_{from_number}"
         history = cache.get(session_key) or []
 
+        if message.lower() in ["yes", "no"]:
+            logger.info(f"Feedback from {from_number}: {message.upper()}")
+            return Response(str(MessagingResponse().message("Thanks for your feedback!")), mimetype="application/xml")
+
         reply = find_products(message)
         if not reply:
             reply = generate_ai_response(message, memory=history)
 
         history.append({"user": message, "bot": reply})
-        cache.set(session_key, history[-10:], timeout=3600)
+        cache.set(session_key, history[-10:], timeout=86400)
 
         twiml = MessagingResponse()
         twiml.message(reply)
