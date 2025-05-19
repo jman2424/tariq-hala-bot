@@ -41,19 +41,11 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ========== NORMALIZE PRODUCT CATALOG ==========
 for category, products in PRODUCT_CATALOG.items():
-    new_products = []
-    for item in products:
-        if isinstance(item, dict):
-            name = item.get("name", "Unnamed")
-            price = item.get("price", "N/A")
-            new_products.append({"name": name, "price": price})
-        elif isinstance(item, str):
-            new_products.append({"name": item, "price": "N/A"})
-        elif isinstance(item, (list, tuple)) and len(item) == 2:
-            new_products.append({"name": item[0], "price": item[1]})
-        else:
-            new_products.append({"name": str(item), "price": "N/A"})
-    PRODUCT_CATALOG[category] = new_products
+    if isinstance(products, dict):
+        normalized = []
+        for name, price in products.items():
+            normalized.append({"name": name, "price": price})
+        PRODUCT_CATALOG[category] = normalized
 
 # ========== UTILITIES ==========
 
@@ -90,7 +82,7 @@ def answer_faqs(message):
         return STORE_INFO.get("delivery_policy", "We offer fast delivery."), True
     if "location" in msg or "address" in msg:
         store_reply = locate_store_by_postcode(msg)
-        return (store_reply or f"Main store is at {STORE_INFO.get('store_location', 'Address not available.')}"), True
+        return (store_reply or f"Main store is at {STORE_INFO.get('store_location', 'Address not available.')}", True)
     if "contact" in msg:
         return f"Contact us at {STORE_INFO.get('contact', 'Unavailable')}", True
     if "history" in msg or "about" in msg:
@@ -217,4 +209,3 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
-
