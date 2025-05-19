@@ -7,12 +7,15 @@ from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 from difflib import get_close_matches
-from openai import OpenAI  # ✅ NEW CLIENT CLASS
+from datetime import datetime
+import pytz
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
 
 from store_info import store_info as STORE_INFO
+from store_info import store_locations as STORE_LOCATIONS
 from product_catalog import PRODUCT_CATALOG
 
 # ========== APP CONFIG ==========
@@ -25,21 +28,41 @@ logger = logging.getLogger("TariqBot")
 
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# ✅ Instantiate OpenAI client (modern SDK)
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+# ========== NORMALIZE PRODUCT CATALOG ==========
+for category, products in PRODUCT_CATALOG.items():
+    new_products = []
+    for item in products:
+        if isinstance(item, dict):
+            name = item.get("name", "Unnamed")
+            price = item.get("price", "N/A")
+            new_products.append({"name": name, "price": price})
+        elif isinstance(item, str):
+            new_products.append({"name": item, "price": "N/A"})
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            new_products.append({"name": item[0], "price": item[1]})
+        else:
+            new_products.append({"name": str(item), "price": "N/A"})
+    PRODUCT_CATALOG[category] = new_products
 
 # ========== UTILITIES ==========
 
+def get_uk_time():
+    uk_time = datetime.now(pytz.timezone("Europe/London"))
+    return uk_time.strftime("%A, %d %B %Y, %I:%M %p")
+
+def locate_store_by_postcode(message):
+    for area, data in STORE_LOCATIONS.items():
+        if area.lower() in message.lower() or data.get("postcode", "").lower() in message.lower():
+            return f"Closest store: {area}\nAddress: {data['address']}\nHours: {data['hours']}"
+    return None
+
 def format_product_catalog(catalog):
-    if not isinstance(catalog, dict):
-        return "Product catalog unavailable."
     lines = []
     for category, products in catalog.items():
         lines.append(f"\n🛒 {category.upper()}:")
         for product in products:
-            if isinstance(product, str):
-                product = {"name": product, "price": "N/A"}
             name = product.get('name', 'Unnamed')
             price = product.get('price', 'N/A')
             lines.append(f"• {name}: {price}")
@@ -49,47 +72,44 @@ def format_store_info(info):
     return "\n".join([f"{k.replace('_',' ').title()}: {v}" for k, v in info.items()])
 
 def answer_faqs(message):
-    message = message.lower()
-    if "hours" in message or "opening" in message or "closing" in message:
-        return f"Our store is open from {STORE_INFO.get('store_hours', '9AM to 9PM')}.", True
-    if "delivery" in message:
+    msg = message.lower()
+    if any(word in msg for word in ["time", "clock", "what time is it"]):
+        return f"Current UK time: {get_uk_time()}", True
+    if "hours" in msg or "opening" in msg or "closing" in msg:
+        return f"Store hours: {STORE_INFO.get('store_hours', '9AM to 9PM')}", True
+    if "delivery" in msg:
         return STORE_INFO.get("delivery_policy", "We offer fast delivery."), True
-    if "location" in message or "address" in message:
-        return f"We are located at {STORE_INFO.get('store_location', 'Address not available.')}", True
-    if "contact" in message:
-        return f"You can reach us at {STORE_INFO.get('phone_number', 'Unavailable')}", True
-    if "history" in message or "about" in message:
+    if "location" in msg or "address" in msg:
+        store_reply = locate_store_by_postcode(msg)
+        return (store_reply or f"Main store is at {STORE_INFO.get('store_location', 'Address not available.')}"), True
+    if "contact" in msg:
+        return f"Contact us at {STORE_INFO.get('phone_number', 'Unavailable')}", True
+    if "history" in msg or "about" in msg:
         return STORE_INFO.get("store_history", "We are proud to serve the community."), True
     return None, False
 
 def search_by_category(message):
     message = message.lower()
-    categories = PRODUCT_CATALOG.keys()
-    match = get_close_matches(message, categories, n=1, cutoff=0.6)
-    if match:
-        return format_category_products(match[0], PRODUCT_CATALOG[match[0]])
-    for cat in categories:
+    for cat in PRODUCT_CATALOG.keys():
         if cat.lower() in message:
             return format_category_products(cat, PRODUCT_CATALOG[cat])
+    match = get_close_matches(message, PRODUCT_CATALOG.keys(), n=1, cutoff=0.6)
+    if match:
+        return format_category_products(match[0], PRODUCT_CATALOG[match[0]])
     return None
 
 def format_category_products(category, products):
     lines = [f"🛒 Products in {category.title()}:"]
     for product in products:
-        if isinstance(product, str):
-            product = {"name": product, "price": "N/A"}
         name = product.get('name', 'Unnamed')
         price = product.get('price', 'N/A')
         lines.append(f"- {name}: {price}")
     return "\n".join(lines)
 
 def fuzzy_product_search(query):
-    query = query.lower()
     results = []
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
-            if isinstance(product, str):
-                product = {"name": product, "price": "N/A"}
             name = product.get('name', '').lower()
             if query in name or query in category.lower():
                 results.append((product['name'], product['price'], category.title()))
@@ -106,7 +126,7 @@ def find_products(message):
     cat_results = search_by_category(message)
     if cat_results:
         return cat_results
-    matches = fuzzy_product_search(message)
+    matches = fuzzy_product_search(message.lower())
     if matches:
         lines = ["🛒 Products matching your query:"]
         for name, price, category in matches:
@@ -117,10 +137,11 @@ def find_products(message):
 def generate_ai_response(message, memory=[]):
     try:
         context = (
-            "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK.\n"
-            f"\nSTORE INFO:\n{format_store_info(STORE_INFO)}"
+            "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK."
+            "\nYou answer using the store info and product catalog."
+            "\nIf you're unsure, politely ask them to call the shop."
+            f"\n\nSTORE INFO:\n{format_store_info(STORE_INFO)}"
             f"\n\nPRODUCT CATALOG:\n{format_product_catalog(PRODUCT_CATALOG)}"
-            "\nAlways respond politely and clearly."
         )
 
         messages = [{"role": "system", "content": context}]
@@ -130,7 +151,7 @@ def generate_ai_response(message, memory=[]):
         messages.append({"role": "user", "content": message})
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=messages,
             temperature=0.4,
             max_tokens=500
@@ -187,4 +208,3 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
-
