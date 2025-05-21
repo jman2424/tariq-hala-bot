@@ -72,7 +72,7 @@ def format_product_catalog(catalog):
 
 
 def format_category_products(category, products):
-    lines = [f"🛒 Products in {category.title()}:]"]
+    lines = [f"🛒 Products in {category.title()}:"]
     for p in products:
         lines.append(f"- {p['name']}: {p['price']}")
     return "\n".join(lines)
@@ -171,7 +171,9 @@ def find_products(message):
     return None
 
 
-def generate_ai_response(message, memory=[]):
+def generate_ai_response(message, memory=None):
+    if memory is None:
+        memory = []
     try:
         context = (
             "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK."
@@ -183,7 +185,7 @@ def generate_ai_response(message, memory=[]):
         messages = [{"role": "system", "content": context}]
         for entry in memory[-5:]:
             messages.append({"role": "user", "content": entry["user"]})
-           .messages.append({"role": "assistant", "content": entry["bot"]})
+            messages.append({"role": "assistant", "content": entry["bot"]})
         messages.append({"role": "user", "content": message})
         response = client.chat.completions.create(
             model="gpt-4",
@@ -261,3 +263,4 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
+
