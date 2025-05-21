@@ -71,8 +71,11 @@ def format_product_catalog(catalog):
     return "\n".join(lines)
 
 
-def format_store_info(info):
-    return "\n".join([f"{k.replace('_',' ').title()}: {v}" for k, v in info.items()])
+def format_category_products(category, products):
+    lines = [f"🛒 Products in {category.title()}:]"]
+    for p in products:
+        lines.append(f"- {p['name']}: {p['price']}")
+    return "\n".join(lines)
 
 
 def answer_faqs(message):
@@ -113,26 +116,58 @@ def fuzzy_product_search(query):
 
 def find_products(message):
     text = message.strip().lower()
-    # Exact product name match
-    for category, products in PRODUCT_CATALOG.items():
-        for prod in products:
-            if prod['name'].lower() == text:
-                return f"🛒 {prod['name']}: {prod['price']}"
-    # FAQs
+
+    # 1) All marinated products
+    if text == "marinated":
+        marinated = []
+        for cat, products in PRODUCT_CATALOG.items():
+            for p in products:
+                if "marinated" in p['name'].lower():
+                    marinated.append((cat, p))
+        if marinated:
+            lines = ["🛒 All marinated products:"]
+            for cat, p in marinated:
+                lines.append(f"- {p['name']} ({cat.title()}): {p['price']}")
+            return "\n".join(lines)
+
+    # 2) Scoped marinated: "marinated chicken"
+    if text.startswith("marinated "):
+        _, scope = text.split(" ", 1)
+        for cat, products in PRODUCT_CATALOG.items():
+            if cat.lower() == scope:
+                filtered = [p for p in products if "marinated" in p['name'].lower()]
+                if filtered:
+                    return format_category_products(cat, filtered)
+
+    # 3) Exact product match
+    for cat, products in PRODUCT_CATALOG.items():
+        for p in products:
+            if p['name'].lower() == text:
+                return f"🛒 {p['name']}: {p['price']}"
+
+    # 4) Exact category match
+    for cat in PRODUCT_CATALOG:
+        if text == cat.lower():
+            return format_category_products(cat, PRODUCT_CATALOG[cat])
+
+    # 5) FAQs
     faq, is_faq = answer_faqs(message)
     if is_faq:
         return faq
-    # Category search
+
+    # 6) Fuzzy category
     cat_results = search_by_category(message)
     if cat_results:
         return cat_results
-    # Fuzzy product search
+
+    # 7) Fuzzy product search
     matches = fuzzy_product_search(text)
     if matches:
         lines = ["🛒 Products matching your query:"]
         for name, price, category in matches:
             lines.append(f"- {name} ({category}): {price}")
         return "\n".join(lines)
+
     return None
 
 
@@ -148,7 +183,7 @@ def generate_ai_response(message, memory=[]):
         messages = [{"role": "system", "content": context}]
         for entry in memory[-5:]:
             messages.append({"role": "user", "content": entry["user"]})
-            messages.append({"role": "assistant", "content": entry["bot"]})
+           .messages.append({"role": "assistant", "content": entry["bot"]})
         messages.append({"role": "user", "content": message})
         response = client.chat.completions.create(
             model="gpt-4",
@@ -161,6 +196,7 @@ def generate_ai_response(message, memory=[]):
         logger.exception("AI response failed")
         return "Sorry, I'm having trouble right now. Please try again later."
 
+
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_handler():
     try:
@@ -171,33 +207,40 @@ def whatsapp_handler():
             request.headers.get("X-Twilio-Signature", "")
         ):
             return "Unauthorized", 403
+
         message = request.values.get("Body", "").strip()
         from_number = request.values.get("From", "")
         if not message:
             return "Empty message", 400
+
         logger.info(f"Message from {from_number}: {message}")
         key = f"session_{from_number}"
         history = cache.get(key) or []
         msg_lower = message.lower()
+
         # Handle feedback
         if msg_lower in ["yes", "no"]:
             logger.info(f"Feedback from {from_number}: {msg_lower.upper()}")
             twiml = MessagingResponse()
             twiml.message("Thanks for your feedback!")
             return Response(str(twiml), mimetype="application/xml")
-        # Handle goodbye -> send farewell + feedback
+
+        # Handle goodbye -> farewell + feedback
         if msg_lower in GOODBYE_KEYWORDS:
             twiml = MessagingResponse()
             twiml.message("Goodbye! Have a great day.")
             twiml.message(FEEDBACK_PROMPT)
             return Response(str(twiml), mimetype="application/xml")
-        # Regular handling
+
+        # Regular flow
         reply = find_products(message)
         if not reply:
             reply = generate_ai_response(message, memory=history)
-        # Cache
+
+        # Cache update
         history.append({"user": message, "bot": reply})
         cache.set(key, history[-10:], timeout=86400)
+
         twiml = MessagingResponse()
         twiml.message(reply)
         return Response(str(twiml), mimetype="application/xml")
@@ -205,13 +248,16 @@ def whatsapp_handler():
         logger.exception("WhatsApp handler failed")
         return "Server Error", 500
 
+
 @app.route("/")
 def home():
     return "🟢 Tariq Halal Meat Shop Chatbot is live."
 
+
 @app.route("/health")
 def health():
     return jsonify({"status": "online"})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
