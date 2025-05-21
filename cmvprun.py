@@ -37,12 +37,12 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Prepare product catalog for fuzzy search
-for category, products in PRODUCT_CATALOG.items():
-    if isinstance(products, dict):
-        PRODUCT_CATALOG[category] = [
-            {"name": name, "price": price}
-            for name, price in products.items()
-        ]
+def normalize_catalog():
+    for category, products in list(PRODUCT_CATALOG.items()):
+        if isinstance(products, dict):
+            PRODUCT_CATALOG[category] = [{"name": name, "price": price} for name, price in products.items()]
+
+normalize_catalog()
 
 # Keywords
 GOODBYE_KEYWORDS = {"bye", "goodbye", "thanks", "thank you", "ta"}
@@ -65,12 +65,10 @@ def locate_store_by_postcode(message):
 def format_product_catalog(catalog):
     lines = []
     for category, products in catalog.items():
-        lines.append(f"
-🛒 {category.upper()}:" )
+        lines.append(f"🛒 {category.title()}:" )
         for product in products:
             lines.append(f"• {product['name']}: {product['price']}")
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 
 def format_store_info(info):
@@ -80,16 +78,6 @@ def format_store_info(info):
     lines = []
     for key, value in info.items():
         lines.append(f"{key.replace('_', ' ').title()}: {value}")
-    return "
-".join(lines)
-
-
-def format_category_products(category, products):
-    lines = []
-    for category, products in catalog.items():
-        lines.append(f"\n🛒 {category.upper()}:")
-        for product in products:
-            lines.append(f"• {product['name']}: {product['price']}")
     return "\n".join(lines)
 
 
@@ -155,11 +143,10 @@ def find_products(message):
     # 2) Scoped marinated: "marinated chicken"
     if text.startswith("marinated "):
         _, scope = text.split(" ", 1)
-        for cat, products in PRODUCT_CATALOG.items():
-            if cat.lower() == scope:
-                filtered = [p for p in products if "marinated" in p['name'].lower()]
-                if filtered:
-                    return format_category_products(cat, filtered)
+        if scope in PRODUCT_CATALOG:
+            filtered = [p for p in PRODUCT_CATALOG[scope] if "marinated" in p['name'].lower()]
+            if filtered:
+                return format_category_products(scope, filtered)
 
     # 3) Exact product match
     for cat, products in PRODUCT_CATALOG.items():
@@ -168,9 +155,8 @@ def find_products(message):
                 return f"🛒 {p['name']}: {p['price']}"
 
     # 4) Exact category match
-    for cat in PRODUCT_CATALOG:
-        if text == cat.lower():
-            return format_category_products(cat, PRODUCT_CATALOG[cat])
+    if text in PRODUCT_CATALOG:
+        return format_category_products(text, PRODUCT_CATALOG[text])
 
     # 5) FAQs
     faq, is_faq = answer_faqs(message)
