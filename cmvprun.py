@@ -65,6 +65,28 @@ def locate_store_by_postcode(message):
 def format_product_catalog(catalog):
     lines = []
     for category, products in catalog.items():
+        lines.append(f"
+🛒 {category.upper()}:" )
+        for product in products:
+            lines.append(f"• {product['name']}: {product['price']}")
+    return "
+".join(lines)
+
+
+def format_store_info(info):
+    """
+    Formats the store info dict into a readable string.
+    """
+    lines = []
+    for key, value in info.items():
+        lines.append(f"{key.replace('_', ' ').title()}: {value}")
+    return "
+".join(lines)
+
+
+def format_category_products(category, products):
+    lines = []
+    for category, products in catalog.items():
         lines.append(f"\n🛒 {category.upper()}:")
         for product in products:
             lines.append(f"• {product['name']}: {product['price']}")
@@ -263,4 +285,3 @@ def health():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
-
