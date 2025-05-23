@@ -208,8 +208,8 @@ def find_products(message: str) -> str | None:
         lines = ["🛒 Products matching your query:"]
         for name, price, cat in matches:
             lines.append(f"- {name} ({cat}): {price}")
-        return '
-'.join(lines)
+        return "
+".join(lines).join(lines)
 
     return None
 
