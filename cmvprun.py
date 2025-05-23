@@ -252,7 +252,14 @@ def whatsapp_handler():
         cache.set(key, history[-10:], timeout=86400)
 
         twiml = MessagingResponse()
-        twiml.message(reply)
+        # Split multiline replies into separate messages for readability
+        if "
+" in reply:
+            for line in reply.split("
+"):
+                twiml.message(line)
+        else:
+            twiml.message(reply)
         return Response(str(twiml), mimetype="application/xml")
     except Exception:
         logger.exception("WhatsApp handler failed")
