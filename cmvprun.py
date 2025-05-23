@@ -1,119 +1,166 @@
 import os
 import logging
+from datetime import datetime, timedelta
+
+import pytz
 from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
+from dotenv import load_dotenv
+from openai import OpenAI
+from rapidfuzz import process
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
-from dotenv import load_dotenv
-from rapidfuzz import process
-from datetime import datetime
-import pytz
-from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# Normalize store locations
-store_locations = {
-    branch: {
-        "address": details.split("|")[0].strip(),
-        "postcode": details.split(",")[-1].strip().split()[0],
-        "hours": STORE_INFO.get("store_hours", "9AM to 9PM")
-    }
-    for branch, details in STORE_INFO.get("branches", {}).items()
-}
-
+# Initialize Flask and cache
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
-cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
+cache = Cache(app, config={"CACHE_TYPE": "SimpleCache"})
 
+# Initialize logger and OpenAI client
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TariqBot")
-
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Prepare product catalog for fuzzy search
+# Constants
+GOODBYE_KEYWORDS = {"bye", "goodbye", "thanks", "thank you", "ta"}
+FEEDBACK_PROMPT = "Was this response helpful? Reply YES or NO."
+SESSION_TTL = 7 * 24 * 3600  # 7 days
+STALE_DURATION = timedelta(days=1)
+
+# ========== Data Preparation ==========
+
 def normalize_catalog():
-    for category, products in list(PRODUCT_CATALOG.items()):
-        if isinstance(products, dict):
-            PRODUCT_CATALOG[category] = [{"name": name, "price": price} for name, price in products.items()]
+    """
+    Convert PRODUCT_CATALOG values from dicts to lists of name/price dicts.
+    """
+    for category, items in list(PRODUCT_CATALOG.items()):
+        if isinstance(items, dict):
+            PRODUCT_CATALOG[category] = [
+                {"name": name, "price": price}
+                for name, price in items.items()
+            ]
 
 normalize_catalog()
 
-# Keywords
-GOODBYE_KEYWORDS = {"bye", "goodbye", "thanks", "thank you", "ta"}
-FEEDBACK_PROMPT = "Was this response helpful? Reply YES or NO."
+store_locations = {}
+for branch, details in STORE_INFO.get("branches", {}).items():
+    address = details.split("|")[0].strip()
+    postcode = details.split(",")[-1].strip().split()[0]
+    hours = STORE_INFO.get("store_hours", "9AM to 9PM")
+    store_locations[branch] = {
+        "address": address,
+        "postcode": postcode,
+        "hours": hours,
+    }
 
-# ========== UTILITIES ==========
+# ========== Utility Functions ==========
 
-def get_uk_time():
-    uk_time = datetime.now(pytz.timezone("Europe/London"))
-    return uk_time.strftime("%A, %d %B %Y, %I:%M %p")
-
-
-def locate_store_by_postcode(message):
-    for area, data in store_locations.items():
-        if area.lower() in message.lower() or data.get("postcode", "").lower() in message.lower():
-            return f"Closest store: {area}\nAddress: {data['address']}\nHours: {data['hours']}"
-    return None
+def get_uk_time() -> str:
+    """
+    Return current UK time as formatted string.
+    """
+    tz = pytz.timezone("Europe/London")
+    now = datetime.now(tz)
+    return now.strftime("%A, %d %B %Y, %I:%M %p")
 
 
-def format_product_catalog(catalog):
+def format_store_info(info: dict) -> str:
+    """
+    Format store info dictionary into readable text.
+    """
+    return "\n".join(
+        f"{key.replace('_', ' ').title()}: {value}"
+        for key, value in info.items()
+    )
+
+
+def format_product_catalog(catalog: dict) -> str:
+    """
+    Format the entire product catalog into readable text.
+    """
     lines = []
     for category, products in catalog.items():
-        lines.append(f"🛒 {category.title()}:" )
+        lines.append(f"🛒 {category.title()}:")
         for product in products:
             lines.append(f"• {product['name']}: {product['price']}")
     return "\n".join(lines)
 
 
-def format_store_info(info):
+def format_category_products(category: str, products: list) -> str:
     """
-    Formats the store info dict into a readable string.
+    Format products for a single category.
     """
-    lines = []
-    for key, value in info.items():
-        lines.append(f"{key.replace('_', ' ').title()}: {value}")
-    return "\n".join(lines)
-
-
-def format_category_products(category, products):
     lines = [f"🛒 Products in {category.title()}:"]
     for p in products:
         lines.append(f"- {p['name']}: {p['price']}")
     return "\n".join(lines)
 
 
-def answer_faqs(message):
-    msg = message.lower()
-    if any(word in msg for word in ["time", "clock"]):
-        return f"Current UK time: {get_uk_time()}", True
-    if any(word in msg for word in ["hours", "opening", "closing"]):
-        return f"Store hours: {STORE_INFO.get('store_hours', '9AM to 9PM')}", True
-    if "delivery" in msg:
-        return STORE_INFO.get("delivery_policy", "We offer fast delivery."), True
-    if any(word in msg for word in ["location", "address"]):
-        store_reply = locate_store_by_postcode(msg)
-        return (store_reply or f"Main store is at {STORE_INFO.get('store_location', 'Address not available.')}", True)
-    if "contact" in msg:
-        return f"Contact us at {STORE_INFO.get('contact', 'Unavailable')}", True
-    if any(word in msg for word in ["history", "about"]):
-        return STORE_INFO.get("store_history", "We are proud to serve the community."), True
-    return None, False
-
-
-def search_by_category(message):
-    match = process.extractOne(message.lower(), PRODUCT_CATALOG.keys(), score_cutoff=60)
-    if match:
-        return format_category_products(match[0], PRODUCT_CATALOG[match[0]])
+def locate_store_by_postcode(message: str) -> str | None:
+    """
+    Find closest store based on postcode or branch name.
+    """
+    low = message.lower()
+    for area, data in store_locations.items():
+        if area.lower() in low or data["postcode"].lower() in low:
+            return (
+                f"Closest store: {area}\n"
+                f"Address: {data['address']}\n"
+                f"Hours: {data['hours']}"
+            )
     return None
 
 
-def fuzzy_product_search(query):
+def answer_faqs(message: str) -> tuple[str, bool] | (None, False):
+    """
+    Handle FAQ-like queries (time, hours, delivery, etc.).
+    """
+    low = message.lower()
+    if "time" in low or "clock" in low:
+        return f"Current UK time: {get_uk_time()}", True
+    if any(k in low for k in ("hours", "opening", "closing")):
+        hours = STORE_INFO.get("store_hours", "9AM to 9PM")
+        return f"Store hours: {hours}", True
+    if "delivery" in low:
+        policy = STORE_INFO.get("delivery_policy", "We offer fast delivery.")
+        return policy, True
+    if "location" in low or "address" in low:
+        reply = locate_store_by_postcode(low)
+        default = STORE_INFO.get("store_location", "Unavailable")
+        return (reply or f"Main store is at {default}"), True
+    if "contact" in low:
+        contact = STORE_INFO.get("contact", "Unavailable")
+        return f"Contact us at {contact}", True
+    if "history" in low or "about" in low:
+        history = STORE_INFO.get("store_history", "We are proud to serve the community.")
+        return history, True
+    return None, False
+
+
+def search_by_category(message: str) -> str | None:
+    """
+    Perform fuzzy match on category names.
+    """
+    match = process.extractOne(message.lower(), PRODUCT_CATALOG.keys(), score_cutoff=60)
+    if not match:
+        return None
+    category = match[0]
+    return format_category_products(category, PRODUCT_CATALOG[category])
+
+
+def fuzzy_product_search(query: str) -> list[tuple[str, str, str]] | None:
+    """
+    Fuzzy search across all products in catalog.
+    Returns list of (name, price, category).
+    """
     results = []
     for category, products in PRODUCT_CATALOG.items():
         names = [p['name'].lower() for p in products]
@@ -124,92 +171,73 @@ def fuzzy_product_search(query):
     return results or None
 
 
-def find_products(message):
+def find_products(message: str) -> str | None:
+    """
+    Determine if a message matches a product, category, FAQ, or fuzzy search.
+    """
     text = message.strip().lower()
 
-    # 1) All marinated products
-    if text == "marinated":
-        marinated = []
-        for cat, products in PRODUCT_CATALOG.items():
-            for p in products:
-                if "marinated" in p['name'].lower():
-                    marinated.append((cat, p))
-        if marinated:
-            lines = ["🛒 All marinated products:"]
-            for cat, p in marinated:
-                lines.append(f"- {p['name']} ({cat.title()}): {p['price']}")
-            return "\n".join(lines)
+    # Exact product match
+    for category, products in PRODUCT_CATALOG.items():
+        for product in products:
+            if product['name'].lower() == text:
+                return f"🛒 {product['name']}: {product['price']}"
 
-    # 2) Scoped marinated: "marinated chicken"
-    if text.startswith("marinated "):
-        _, scope = text.split(" ", 1)
-        if scope in PRODUCT_CATALOG:
-            filtered = [p for p in PRODUCT_CATALOG[scope] if "marinated" in p['name'].lower()]
-            if filtered:
-                return format_category_products(scope, filtered)
-
-    # 3) Exact product match
-    for cat, products in PRODUCT_CATALOG.items():
-        for p in products:
-            if p['name'].lower() == text:
-                return f"🛒 {p['name']}: {p['price']}"
-
-    # 4) Exact category match
+    # Exact category match
     if text in PRODUCT_CATALOG:
         return format_category_products(text, PRODUCT_CATALOG[text])
 
-    # 5) FAQs
+    # FAQs
     faq, is_faq = answer_faqs(message)
     if is_faq:
         return faq
 
-    # 6) Fuzzy category
-    cat_results = search_by_category(message)
-    if cat_results:
-        return cat_results
+    # Category fuzzy search
+    category_result = search_by_category(message)
+    if category_result:
+        return category_result
 
-    # 7) Fuzzy product search
+    # Fuzzy product search
     matches = fuzzy_product_search(text)
     if matches:
         lines = ["🛒 Products matching your query:"]
-        for name, price, category in matches:
-            lines.append(f"- {name} ({category}): {price}")
+        for name, price, cat in matches:
+            lines.append(f"- {name} ({cat}): {price}")
         return "\n".join(lines)
 
     return None
 
 
-def generate_ai_response(message, memory=None):
-    if memory is None:
-        memory = []
-    try:
-        context = (
-            "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK."
-            "\nYou answer using the store info and product catalog."
-            "\nIf you're unsure, politely ask them to call the shop."
-            f"\n\nSTORE INFO:\n{format_store_info(STORE_INFO)}"
-            f"\n\nPRODUCT CATALOG:\n{format_product_catalog(PRODUCT_CATALOG)}"
-        )
-        messages = [{"role": "system", "content": context}]
-        for entry in memory[-5:]:
-            messages.append({"role": "user", "content": entry["user"]})
-            messages.append({"role": "assistant", "content": entry["bot"]})
-        messages.append({"role": "user", "content": message})
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0.4,
-            max_tokens=500
-        )
-        return response.choices[0].message.content.strip()
-    except Exception:
-        logger.exception("AI response failed")
-        return "Sorry, I'm having trouble right now. Please try again later."
+def generate_ai_response(message: str, memory: list[dict], model: str = 'gpt-4') -> str:
+    """
+    Call OpenAI chat completion with system context and conversation memory.
+    """
+    system_prompt = (
+        "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK."
+        "\nAnswer using store info and product catalog."
+    )
+    system_prompt += f"\n\nSTORE INFO:\n{format_store_info(STORE_INFO)}"
+    system_prompt += f"\n\nPRODUCT CATALOG:\n{format_product_catalog(PRODUCT_CATALOG)}"
 
+    messages = [{"role": "system", "content": system_prompt}]
+    for entry in memory[-5:]:
+        messages.append({"role": "user", "content": entry['user']})
+        messages.append({"role": "assistant", "content": entry['bot']})
+    messages.append({"role": "user", "content": message})
 
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0.4,
+        max_tokens=500
+    )
+    return response.choices[0].message.content.strip()
+
+# ========== Webhook Handler ==========
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_handler():
     try:
+        # Validate Twilio request
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
         if not validator.validate(
             request.url,
@@ -218,63 +246,66 @@ def whatsapp_handler():
         ):
             return "Unauthorized", 403
 
-        message = request.values.get("Body", "").strip()
-        from_number = request.values.get("From", "")
-        if not message:
+        body = request.values.get("Body", "").strip()
+        sender = request.values.get("From", "")
+        if not body:
             return "Empty message", 400
 
-        logger.info(f"Message from {from_number}: {message}")
-        key = f"session_{from_number}"
-        history = cache.get(key) or []
-        msg_lower = message.lower()
+        logger.info(f"Received from {sender}: {body}")
+
+        # Retrieve session or initialize
+        session_key = f"session_{sender}"
+        session = cache.get(session_key) or {"history": [], "last": datetime.utcnow()}
+        history = session['history']
+        last_time = session['last']
+        now = datetime.utcnow()
+
+        # Determine model based on inactivity
+        inactive = (now - last_time) > STALE_DURATION
+        model_name = 'gpt-3.5-turbo' if inactive else 'gpt-4'
 
         # Handle feedback
-        if msg_lower in ["yes", "no"]:
-            logger.info(f"Feedback from {from_number}: {msg_lower.upper()}")
+        low = body.lower()
+        if low in ["yes", "no"]:
             twiml = MessagingResponse()
             twiml.message("Thanks for your feedback!")
             return Response(str(twiml), mimetype="application/xml")
 
-        # Handle goodbye -> farewell + feedback
-        if msg_lower in GOODBYE_KEYWORDS:
+        # Handle goodbye
+        if low in GOODBYE_KEYWORDS:
             twiml = MessagingResponse()
             twiml.message("Goodbye! Have a great day.")
             twiml.message(FEEDBACK_PROMPT)
             return Response(str(twiml), mimetype="application/xml")
 
-        # Regular flow
-        reply = find_products(message)
+        # Generate reply
+        reply = find_products(body)
         if not reply:
-            reply = generate_ai_response(message, memory=history)
+            reply = generate_ai_response(body, history, model=model_name)
 
-        # Cache update
-        history.append({"user": message, "bot": reply})
-        cache.set(key, history[-10:], timeout=86400)
+        # Update session
+        history.append({"user": body, "bot": reply})
+        session['last'] = now
+        cache.set(session_key, session, timeout=SESSION_TTL)
 
+        # Send response, splitting lines for readability
         twiml = MessagingResponse()
-        # Split multiline replies into separate messages for readability
-        if "
-" in reply:
-            for line in reply.split("
-"):
-                twiml.message(line)
-        else:
-            twiml.message(reply)
-        return Response(str(twiml), mimetype="application/xml")
-    except Exception:
-        logger.exception("WhatsApp handler failed")
-        return "Server Error", 500
+        for line in reply.split("\n"):
+            twiml.message(line)
 
+        return Response(str(twiml), mimetype="application/xml")
+
+    except Exception:
+        logger.exception("Error in whatsapp_handler")
+        return "Server Error", 500
 
 @app.route("/")
 def home():
     return "🟢 Tariq Halal Meat Shop Chatbot is live."
 
-
 @app.route("/health")
 def health():
     return jsonify({"status": "online"})
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)), debug=False)
