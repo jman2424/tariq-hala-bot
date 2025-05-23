@@ -32,14 +32,12 @@ FEEDBACK_PROMPT = "Was this response helpful? Reply YES or NO."
 SESSION_TTL = 7 * 24 * 3600
 STALE_DURATION = timedelta(days=1)
 
-def normalize_catalog():
-    for category, items in list(PRODUCT_CATALOG.items()):
-        if isinstance(items, dict):
-            PRODUCT_CATALOG[category] = [
-                {"name": name, "price": price} for name, price in items.items()
-            ]
-
-normalize_catalog()
+# Normalize product catalog
+for category, items in list(PRODUCT_CATALOG.items()):
+    if isinstance(items, dict):
+        PRODUCT_CATALOG[category] = [
+            {"name": name, "price": price} for name, price in items.items()
+        ]
 
 store_locations = {
     branch: {
@@ -129,10 +127,7 @@ def find_products(message):
         if text in product['name'].lower()
     ]
     if matches:
-        lines = ["🛒 Products matching your query:"]
-        for name, price, cat in matches:
-            lines.append(f"- {name} ({cat}): {price}")
-        return "\n".join(lines)
+        return "\n".join(["🛒 Products matching your query:"] + [f"- {n} ({c}): {p}" for n, p, c in matches])
     return None
 
 def generate_ai_response(message, memory, model='gpt-4'):
