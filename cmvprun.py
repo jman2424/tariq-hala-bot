@@ -209,7 +209,7 @@ def find_products(message: str) -> str | None:
         for name, price, cat in matches:
             lines.append(f"- {name} ({cat}): {price}")
         return "
-".join(lines)  # fixed unterminated string issue
+".join(lines)
 
     return None
 
