@@ -197,13 +197,19 @@ def find_products(message: str) -> str | None:
     if category_result:
         return category_result
 
-    # Fuzzy product search
-    matches = fuzzy_product_search(text)
+    # Fuzzy product search with nested category support
+    matches = []
+    for category, products in PRODUCT_CATALOG.items():
+        for product in products:
+            if text in product['name'].lower():
+                matches.append((product['name'], product['price'], category.title()))
+
     if matches:
         lines = ["🛒 Products matching your query:"]
         for name, price, cat in matches:
             lines.append(f"- {name} ({cat}): {price}")
-        return "\n".join(lines)
+        return "
+".join(lines)
 
     return None
 
