@@ -119,7 +119,7 @@ def locate_store_by_postcode(message: str) -> str | None:
     return None
 
 
-def answer_faqs(message: str) -> tuple[str, bool] | (None, False):
+def answer_faqs(message: str) -> tuple[str, bool] | tuple[None, bool]:
     """
     Handle FAQ-like queries (time, hours, delivery, etc.).
     """
