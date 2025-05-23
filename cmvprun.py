@@ -38,9 +38,6 @@ STALE_DURATION = timedelta(days=1)
 # ========== Data Preparation ==========
 
 def normalize_catalog():
-    """
-    Convert PRODUCT_CATALOG values from dicts to lists of name/price dicts.
-    """
     for category, items in list(PRODUCT_CATALOG.items()):
         if isinstance(items, dict):
             PRODUCT_CATALOG[category] = [
@@ -64,28 +61,17 @@ for branch, details in STORE_INFO.get("branches", {}).items():
 # ========== Utility Functions ==========
 
 def get_uk_time() -> str:
-    """
-    Return current UK time as formatted string.
-    """
     tz = pytz.timezone("Europe/London")
     now = datetime.now(tz)
     return now.strftime("%A, %d %B %Y, %I:%M %p")
 
-
 def format_store_info(info: dict) -> str:
-    """
-    Format store info dictionary into readable text.
-    """
     return "\n".join(
         f"{key.replace('_', ' ').title()}: {value}"
         for key, value in info.items()
     )
 
-
 def format_product_catalog(catalog: dict) -> str:
-    """
-    Format the entire product catalog into readable text.
-    """
     lines = []
     for category, products in catalog.items():
         lines.append(f"🛒 {category.title()}:")
@@ -93,21 +79,13 @@ def format_product_catalog(catalog: dict) -> str:
             lines.append(f"• {product['name']}: {product['price']}")
     return "\n".join(lines)
 
-
 def format_category_products(category: str, products: list) -> str:
-    """
-    Format products for a single category.
-    """
     lines = [f"🛒 Products in {category.title()}:"]
     for p in products:
         lines.append(f"- {p['name']}: {p['price']}")
     return "\n".join(lines)
 
-
 def locate_store_by_postcode(message: str) -> str | None:
-    """
-    Find closest store based on postcode or branch name.
-    """
     low = message.lower()
     for area, data in store_locations.items():
         if area.lower() in low or data["postcode"].lower() in low:
@@ -118,11 +96,7 @@ def locate_store_by_postcode(message: str) -> str | None:
             )
     return None
 
-
 def answer_faqs(message: str) -> tuple[str, bool] | tuple[None, bool]:
-    """
-    Handle FAQ-like queries (time, hours, delivery, etc.).
-    """
     low = message.lower()
     if "time" in low or "clock" in low:
         return f"Current UK time: {get_uk_time()}", True
@@ -144,23 +118,14 @@ def answer_faqs(message: str) -> tuple[str, bool] | tuple[None, bool]:
         return history, True
     return None, False
 
-
 def search_by_category(message: str) -> str | None:
-    """
-    Perform fuzzy match on category names.
-    """
     match = process.extractOne(message.lower(), PRODUCT_CATALOG.keys(), score_cutoff=60)
     if not match:
         return None
     category = match[0]
     return format_category_products(category, PRODUCT_CATALOG[category])
 
-
 def fuzzy_product_search(query: str) -> list[tuple[str, str, str]] | None:
-    """
-    Fuzzy search across all products in catalog.
-    Returns list of (name, price, category).
-    """
     results = []
     for category, products in PRODUCT_CATALOG.items():
         names = [p['name'].lower() for p in products]
@@ -170,34 +135,25 @@ def fuzzy_product_search(query: str) -> list[tuple[str, str, str]] | None:
             results.append((prod['name'], prod['price'], category.title()))
     return results or None
 
-
 def find_products(message: str) -> str | None:
-    """
-    Determine if a message matches a product, category, FAQ, or fuzzy search.
-    """
     text = message.strip().lower()
 
-    # Exact product match
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
             if product['name'].lower() == text:
                 return f"🛒 {product['name']}: {product['price']}"
 
-    # Exact category match
     if text in PRODUCT_CATALOG:
         return format_category_products(text, PRODUCT_CATALOG[text])
 
-    # FAQs
     faq, is_faq = answer_faqs(message)
     if is_faq:
         return faq
 
-    # Category fuzzy search
     category_result = search_by_category(message)
     if category_result:
         return category_result
 
-    # Fuzzy product search with nested category support
     matches = []
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
@@ -208,16 +164,11 @@ def find_products(message: str) -> str | None:
         lines = ["🛒 Products matching your query:"]
         for name, price, cat in matches:
             lines.append(f"- {name} ({cat}): {price}")
-        return "
-".join(lines).join(lines)
+        return "\n".join(lines)
 
     return None
 
-
 def generate_ai_response(message: str, memory: list[dict], model: str = 'gpt-4') -> str:
-    """
-    Call OpenAI chat completion with system context and conversation memory.
-    """
     system_prompt = (
         "You are the helpful WhatsApp assistant for Tariq Halal Meat Shop UK."
         "\nAnswer using store info and product catalog."
@@ -243,7 +194,6 @@ def generate_ai_response(message: str, memory: list[dict], model: str = 'gpt-4')
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_handler():
     try:
-        # Validate Twilio request
         validator = RequestValidator(TWILIO_AUTH_TOKEN)
         if not validator.validate(
             request.url,
@@ -259,42 +209,35 @@ def whatsapp_handler():
 
         logger.info(f"Received from {sender}: {body}")
 
-        # Retrieve session or initialize
         session_key = f"session_{sender}"
         session = cache.get(session_key) or {"history": [], "last": datetime.utcnow()}
         history = session['history']
         last_time = session['last']
         now = datetime.utcnow()
 
-        # Determine model based on inactivity
         inactive = (now - last_time) > STALE_DURATION
         model_name = 'gpt-3.5-turbo' if inactive else 'gpt-4'
 
-        # Handle feedback
         low = body.lower()
         if low in ["yes", "no"]:
             twiml = MessagingResponse()
             twiml.message("Thanks for your feedback!")
             return Response(str(twiml), mimetype="application/xml")
 
-        # Handle goodbye
         if low in GOODBYE_KEYWORDS:
             twiml = MessagingResponse()
             twiml.message("Goodbye! Have a great day.")
             twiml.message(FEEDBACK_PROMPT)
             return Response(str(twiml), mimetype="application/xml")
 
-        # Generate reply
         reply = find_products(body)
         if not reply:
             reply = generate_ai_response(body, history, model=model_name)
 
-        # Update session
         history.append({"user": body, "bot": reply})
         session['last'] = now
         cache.set(session_key, session, timeout=SESSION_TTL)
 
-        # Send response, splitting lines for readability
         twiml = MessagingResponse()
         for line in reply.split("\n"):
             twiml.message(line)
