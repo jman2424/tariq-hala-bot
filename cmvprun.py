@@ -65,7 +65,7 @@ def format_product_catalog(catalog):
 def format_category_products(category, products):
     lines = [f"🛒 Products in {category.title()}:"]
     for p in products:
-        lines.append(f"- {p['name']}: {p['price']}")
+        lines.append(f"• {p['name']}: {p['price']}")
     return "\n".join(lines)
 
 def locate_store_by_postcode(message):
@@ -108,6 +108,8 @@ def fuzzy_product_search(query):
 
 def find_products(message):
     text = message.strip().lower()
+    if len(text.split()) <= 1 and text not in PRODUCT_CATALOG:
+        return None
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
             if product['name'].lower() == text:
@@ -127,7 +129,7 @@ def find_products(message):
         if text in product['name'].lower()
     ]
     if matches:
-        return "\n".join(["🛒 Products matching your query:"] + [f"- {n} ({c}): {p}" for n, p, c in matches])
+        return "\n".join(["🛒 Products matching your query:"] + [f"• {n} ({c}): {p}" for n, p, c in matches])
     return None
 
 def generate_ai_response(message, memory, model='gpt-4'):
