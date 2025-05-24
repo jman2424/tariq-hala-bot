@@ -1,5 +1,7 @@
 import os
 import logging
+import time
+import re
 from datetime import datetime, timedelta
 
 import pytz
@@ -36,7 +38,7 @@ FEEDBACK_PROMPT = "Was this response helpful? Reply YES or NO."
 SESSION_TTL = 7 * 24 * 3600
 STALE_DURATION = timedelta(days=1)
 
-# Normalize catalog for consistent structure
+# Normalize catalog
 for category, items in list(PRODUCT_CATALOG.items()):
     if isinstance(items, dict):
         PRODUCT_CATALOG[category] = [
@@ -113,6 +115,21 @@ def find_products(message):
     text = message.strip().lower()
     if text in GREETINGS:
         return "Hello! How can I assist you today with your Tariq Halal Meat Shop needs?"
+
+    match = re.search(r'under £?(\d+(?:\.\d{1,2})?)', text)
+    if match:
+        price_limit = float(match.group(1))
+        cheap_products = [
+            f"- {p['name']}: {p['price']}"
+            for cat in PRODUCT_CATALOG.values()
+            for p in cat
+            if float(p['price'].replace('£', '')) < price_limit
+        ]
+        if cheap_products:
+            return "\n".join(["🛒 Products under your price limit:"] + cheap_products)
+
+    if text in {"menu", "categories", "all categories"}:
+        return "🗂 Available Categories:\n" + "\n".join(f"• {cat.title()}" for cat in PRODUCT_CATALOG)
 
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
@@ -198,6 +215,7 @@ def whatsapp_handler():
 
         twiml = MessagingResponse()
         twiml.message(reply)
+        time.sleep(1.2)  # simulate delay
         return Response(str(twiml), mimetype="application/xml")
     except Exception:
         logger.exception("Error in whatsapp_handler")
