@@ -19,20 +19,24 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
+# Initialize app
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={"CACHE_TYPE": "SimpleCache"})
 
+# Set up logging and OpenAI client
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TariqBot")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# Constants
 GOODBYE_KEYWORDS = {"bye", "goodbye", "thanks", "thank you", "ta"}
+GREETINGS = {"hi", "hello", "yo", "salaam", "assalamu alaikum"}
 FEEDBACK_PROMPT = "Was this response helpful? Reply YES or NO."
 SESSION_TTL = 7 * 24 * 3600
 STALE_DURATION = timedelta(days=1)
 
-# Normalize product catalog
+# Normalize catalog for consistent structure
 for category, items in list(PRODUCT_CATALOG.items()):
     if isinstance(items, dict):
         PRODUCT_CATALOG[category] = [
@@ -64,8 +68,7 @@ def format_product_catalog(catalog):
 
 def format_category_products(category, products):
     lines = [f"🛒 Products in {category.title()}:"]
-    for p in products:
-        lines.append(f"• {p['name']}: {p['price']}")
+    lines.extend(f"- {p['name']}: {p['price']}" for p in products)
     return "\n".join(lines)
 
 def locate_store_by_postcode(message):
@@ -108,10 +111,8 @@ def fuzzy_product_search(query):
 
 def find_products(message):
     text = message.strip().lower()
-
-    # Skip empty or non-product greeting-like messages
-    if text in ["yo", "hi", "hello", "hey"]:
-        return None
+    if text in GREETINGS:
+        return "Hello! How can I assist you today with your Tariq Halal Meat Shop needs?"
 
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
@@ -136,9 +137,7 @@ def find_products(message):
         if text in product['name'].lower()
     ]
     if matches:
-        return "
-".join(["🛒 Products matching your query:"] + [f"- {n} ({c}): {p}" for n, p, c in matches])
-
+        return "\n".join(["🛒 Products matching your query:"] + [f"- {n} ({c}): {p}" for n, p, c in matches])
     return None
 
 def generate_ai_response(message, memory, model='gpt-4'):
