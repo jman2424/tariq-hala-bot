@@ -108,20 +108,27 @@ def fuzzy_product_search(query):
 
 def find_products(message):
     text = message.strip().lower()
-    if len(text.split()) <= 1 and text not in PRODUCT_CATALOG:
+
+    # Skip empty or non-product greeting-like messages
+    if text in ["yo", "hi", "hello", "hey"]:
         return None
+
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
             if product['name'].lower() == text:
                 return f"🛒 {product['name']}: {product['price']}"
+
     if text in PRODUCT_CATALOG:
         return format_category_products(text, PRODUCT_CATALOG[text])
+
     faq, is_faq = answer_faqs(message)
     if is_faq:
         return faq
+
     cat = search_by_category(text)
     if cat:
         return cat
+
     matches = [
         (product['name'], product['price'], category.title())
         for category, products in PRODUCT_CATALOG.items()
@@ -129,7 +136,9 @@ def find_products(message):
         if text in product['name'].lower()
     ]
     if matches:
-        return "\n".join(["🛒 Products matching your query:"] + [f"• {n} ({c}): {p}" for n, p, c in matches])
+        return "
+".join(["🛒 Products matching your query:"] + [f"- {n} ({c}): {p}" for n, p, c in matches])
+
     return None
 
 def generate_ai_response(message, memory, model='gpt-4'):
