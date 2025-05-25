@@ -215,7 +215,7 @@ def whatsapp_handler():
 
         twiml = MessagingResponse()
         twiml.message(reply)
-        time.sleep(1.2)  # simulate delay
+        time.sleep(1.2)
         return Response(str(twiml), mimetype="application/xml")
     except Exception:
         logger.exception("Error in whatsapp_handler")
