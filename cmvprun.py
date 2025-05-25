@@ -70,7 +70,7 @@ def format_product_catalog(catalog):
 
 def format_category_products(category, products):
     lines = [f"🛒 Products in {category.title()}:"]
-    lines.extend(f"- {p['name']}: {p['price']}" for p in products)
+    lines.extend(f"• {p['name']}: {p['price']}" for p in products)
     return "\n".join(lines)
 
 def locate_store_by_postcode(message):
@@ -120,7 +120,7 @@ def find_products(message):
     if match:
         price_limit = float(match.group(1))
         cheap_products = [
-            f"- {p['name']}: {p['price']}"
+            f"• {p['name']}: {p['price']}"
             for cat in PRODUCT_CATALOG.values()
             for p in cat
             if float(p['price'].replace('£', '')) < price_limit
@@ -154,7 +154,7 @@ def find_products(message):
         if text in product['name'].lower()
     ]
     if matches:
-        return "\n".join(["🛒 Products matching your query:"] + [f"- {n} ({c}): {p}" for n, p, c in matches])
+        return "\n".join(["🛒 Products matching your query:"] + [f"• {n} ({c}): {p}" for n, p, c in matches])
     return None
 
 def generate_ai_response(message, memory, model='gpt-4'):
@@ -214,7 +214,8 @@ def whatsapp_handler():
         cache.set(session_key, session, timeout=SESSION_TTL)
 
         twiml = MessagingResponse()
-        twiml.message(reply)
+        for chunk in reply.split("\n"):
+            twiml.message(chunk)
         time.sleep(1.2)
         return Response(str(twiml), mimetype="application/xml")
     except Exception:
