@@ -1,9 +1,7 @@
 import os
 import logging
 import time
-import re
 from datetime import datetime, timedelta
-
 import pytz
 from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
@@ -21,12 +19,12 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 from store_info import store_info as STORE_INFO
 from product_catalog import PRODUCT_CATALOG
 
-# Initialize app
+# Flask app setup
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 cache = Cache(app, config={"CACHE_TYPE": "SimpleCache"})
 
-# Set up logging and OpenAI client
+# Logging & OpenAI
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TariqBot")
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -38,12 +36,10 @@ FEEDBACK_PROMPT = "Was this response helpful? Reply YES or NO."
 SESSION_TTL = 7 * 24 * 3600
 STALE_DURATION = timedelta(days=1)
 
-# Normalize catalog
+# Normalize catalog to list format
 for category, items in list(PRODUCT_CATALOG.items()):
     if isinstance(items, dict):
-        PRODUCT_CATALOG[category] = [
-            {"name": name, "price": price} for name, price in items.items()
-        ]
+        PRODUCT_CATALOG[category] = [{"name": k, "price": v} for k, v in items.items()]
 
 store_locations = {
     branch: {
@@ -63,7 +59,7 @@ def format_store_info(info):
 def format_product_catalog(catalog):
     lines = []
     for category, products in catalog.items():
-        lines.append(f"🛒 {category.title()}:")
+        lines.append(f"\n🛒 {category.title()}:")
         for product in products:
             lines.append(f"• {product['name']}: {product['price']}")
     return "\n".join(lines)
@@ -113,31 +109,20 @@ def fuzzy_product_search(query):
 
 def find_products(message):
     text = message.strip().lower()
+
     if text in GREETINGS:
         return "Hello! How can I assist you today with your Tariq Halal Meat Shop needs?"
 
-    match = re.search(r'under £?(\d+(?:\.\d{1,2})?)', text)
-    if match:
-        price_limit = float(match.group(1))
-        cheap_products = [
-            f"• {p['name']}: {p['price']}"
-            for cat in PRODUCT_CATALOG.values()
-            for p in cat
-            if float(p['price'].replace('£', '')) < price_limit
-        ]
-        if cheap_products:
-            return "\n".join(["🛒 Products under your price limit:"] + cheap_products)
-
     if text in {"menu", "categories", "all categories"}:
         return "🗂 Available Categories:\n" + "\n".join(f"• {cat.title()}" for cat in PRODUCT_CATALOG)
+
+    if text in PRODUCT_CATALOG:
+        return format_category_products(text, PRODUCT_CATALOG[text])
 
     for category, products in PRODUCT_CATALOG.items():
         for product in products:
             if product['name'].lower() == text:
                 return f"🛒 {product['name']}: {product['price']}"
-
-    if text in PRODUCT_CATALOG:
-        return format_category_products(text, PRODUCT_CATALOG[text])
 
     faq, is_faq = answer_faqs(message)
     if is_faq:
@@ -155,6 +140,7 @@ def find_products(message):
     ]
     if matches:
         return "\n".join(["🛒 Products matching your query:"] + [f"• {n} ({c}): {p}" for n, p, c in matches])
+
     return None
 
 def generate_ai_response(message, memory, model='gpt-4'):
@@ -214,8 +200,7 @@ def whatsapp_handler():
         cache.set(session_key, session, timeout=SESSION_TTL)
 
         twiml = MessagingResponse()
-        for chunk in reply.split("\n"):
-            twiml.message(chunk)
+        twiml.message(reply)
         time.sleep(1.2)
         return Response(str(twiml), mimetype="application/xml")
     except Exception:
